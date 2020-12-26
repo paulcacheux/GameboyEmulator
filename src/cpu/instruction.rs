@@ -20,6 +20,9 @@ pub enum Instruction {
     XorAReg8 {
         reg: Register8,
     },
+    AddAIndirect {
+        addr: Register16,
+    },
     SubAReg8 {
         reg: Register8,
     },
@@ -77,6 +80,9 @@ pub enum Instruction {
     },
     CompareLit {
         literal: u8,
+    },
+    CompareIndirectAddr {
+        addr: Register16,
     },
     RotateLeftThroughCarryA,
     RotateLeftThroughCarry {
@@ -136,6 +142,9 @@ impl fmt::Display for Instruction {
             Instruction::XorAReg8 { reg } => {
                 write!(f, "XOR A, {}", reg)
             }
+            Instruction::AddAIndirect { addr } => {
+                write!(f, "ADD A, ({})", addr)
+            }
             Instruction::SubAReg8 { reg } => {
                 write!(f, "SUB A, {}", reg)
             }
@@ -193,6 +202,9 @@ impl fmt::Display for Instruction {
             Instruction::CompareLit { literal } => {
                 write!(f, "CP ${:02x}", literal)
             }
+            Instruction::CompareIndirectAddr { addr } => {
+                write!(f, "CP ({})", addr)
+            }
             Instruction::RotateLeftThroughCarryA => {
                 write!(f, "RLA")
             }
@@ -226,6 +238,9 @@ impl Instruction {
             }
             Instruction::XorAReg8 { reg } => {
                 vec![MicroOp::XorAReg { reg }]
+            }
+            Instruction::AddAIndirect { addr } => {
+                vec![MicroOp::NOP, MicroOp::AddAIndirect { addr }]
             }
             Instruction::SubAReg8 { reg } => {
                 vec![MicroOp::SubAReg { reg }]
@@ -362,6 +377,9 @@ impl Instruction {
             Instruction::CompareLit { literal } => {
                 vec![MicroOp::NOP, MicroOp::CompareALit { literal }]
             }
+            Instruction::CompareIndirectAddr { addr } => {
+                vec![MicroOp::NOP, MicroOp::CompareAIndirect { addr }]
+            }
             Instruction::RotateLeftThroughCarryA => vec![MicroOp::RotateLeftThroughCarry {
                 reg: Register8::A,
                 set_zero: false,
@@ -396,6 +414,9 @@ pub enum MicroOp {
     },
     XorAReg {
         reg: Register8,
+    },
+    AddAIndirect {
+        addr: Register16,
     },
     SubAReg {
         reg: Register8,
@@ -438,6 +459,9 @@ pub enum MicroOp {
     },
     CompareALit {
         literal: u8,
+    },
+    CompareAIndirect {
+        addr: Register16,
     },
     RotateLeftThroughCarry {
         reg: Register8,

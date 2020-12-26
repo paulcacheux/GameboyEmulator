@@ -139,6 +139,7 @@ impl<M: Memory> CPU<M> {
     }
 
     pub fn fetch_and_decode(&mut self) -> Instruction {
+        let pc = self.pc;
         let opcode = self.fetch_and_advance();
 
         match opcode {
@@ -163,6 +164,10 @@ impl<M: Memory> CPU<M> {
                 reg: Register16::DE,
             },
             0x15 => Instruction::DecReg8 { reg: Register8::D },
+            0x16 => Instruction::LoadRegLit8bits {
+                reg: Register8::D,
+                literal: self.fetch_and_advance(),
+            },
             0x17 => Instruction::RotateLeftThroughCarryA,
             0x18 => Instruction::JumpRelative {
                 condition: None,
@@ -228,6 +233,15 @@ impl<M: Memory> CPU<M> {
                 dest: Register8::H,
                 src: Register8::A,
             },
+            0x77 => Instruction::WriteMem {
+                addr: Register16::HL,
+                reg: Register8::A,
+                post_op: None,
+            },
+            0x78 => Instruction::Move {
+                dest: Register8::A,
+                src: Register8::B,
+            },
             0x7B => Instruction::Move {
                 dest: Register8::A,
                 src: Register8::E,
@@ -236,10 +250,12 @@ impl<M: Memory> CPU<M> {
                 dest: Register8::A,
                 src: Register8::H,
             },
-            0x77 => Instruction::WriteMem {
+            0x7D => Instruction::Move {
+                dest: Register8::A,
+                src: Register8::L,
+            },
+            0x86 => Instruction::AddAIndirect {
                 addr: Register16::HL,
-                reg: Register8::A,
-                post_op: None,
             },
             0x90 => Instruction::SubAReg8 { reg: Register8::B },
             0xA8 => Instruction::XorAReg8 { reg: Register8::B },
@@ -249,6 +265,9 @@ impl<M: Memory> CPU<M> {
             0xAC => Instruction::XorAReg8 { reg: Register8::H },
             0xAD => Instruction::XorAReg8 { reg: Register8::L },
             0xAF => Instruction::XorAReg8 { reg: Register8::A },
+            0xBE => Instruction::CompareIndirectAddr {
+                addr: Register16::HL,
+            },
             0xC1 => Instruction::PopReg16 {
                 reg: Register16::BC,
             },
@@ -289,7 +308,7 @@ impl<M: Memory> CPU<M> {
             0xFE => Instruction::CompareLit {
                 literal: self.fetch_and_advance(),
             },
-            _ => panic!("Unknown opcode {:#x}", opcode),
+            _ => panic!("Unknown opcode {:#x} at {:#x}", opcode, pc),
         }
     }
 
@@ -308,6 +327,9 @@ impl<M: Memory> CPU<M> {
     pub fn step(&mut self) {
         if self.pipeline.is_empty() {
             let pc = self.pc;
+            if pc > 0x100 {
+                panic!("End of bootstrap rom")
+            }
             let instruction = self.fetch_and_decode();
             debug!("{:#06x}: {}", pc, instruction);
             self.pipeline.extend(instruction.to_micro_ops());
@@ -333,27 +355,25 @@ impl<M: Memory> CPU<M> {
                         Flags::empty()
                     };
                 }
+                MicroOp::AddAIndirect { addr } => {
+                    let a_value = self.reg_a;
+                    let rhs_value = self.memory.read_memory(self.load_reg16(addr));
+
+                    let (res, carry) = a_value.overflowing_add(rhs_value);
+                    let half_carry = check_half_carry(a_value, rhs_value);
+
+                    self.reg_a = res;
+                    self.update_flags_arith(res, false, carry, half_carry);
+                }
                 MicroOp::SubAReg { reg } => {
                     let a_value = self.reg_a;
                     let rhs_value = self.load_reg8(reg);
+
                     let (res, carry) = a_value.overflowing_sub(rhs_value);
                     let half_carry = check_half_carry_sub(a_value, rhs_value);
 
-                    let mut flags = Flags::NEGATIVE;
-                    if carry {
-                        flags |= Flags::CARRY;
-                    }
-
-                    if half_carry {
-                        flags |= Flags::HALF_CARRY;
-                    }
-
-                    if res == 0 {
-                        flags |= Flags::ZERO;
-                    }
-
                     self.reg_a = res;
-                    self.flags = flags;
+                    self.update_flags_arith(res, true, carry, half_carry);
                 }
                 MicroOp::WriteMemLit { addr, reg } => {
                     self.memory.write_memory(addr, self.load_reg8(reg));
@@ -442,22 +462,10 @@ impl<M: Memory> CPU<M> {
                     self.flags = flags;
                 }
                 MicroOp::CompareALit { literal } => {
-                    let a_value = self.reg_a;
-                    let (res, carry) = a_value.overflowing_sub(literal);
-
-                    let mut flags = Flags::NEGATIVE;
-                    if res == 0 {
-                        flags |= Flags::ZERO;
-                    }
-
-                    if check_half_carry_sub(a_value, literal) {
-                        flags |= Flags::HALF_CARRY;
-                    }
-
-                    if carry {
-                        flags |= Flags::CARRY;
-                    }
-                    self.flags = flags;
+                    self.compare_a(literal);
+                }
+                MicroOp::CompareAIndirect { addr } => {
+                    self.compare_a(self.memory.read_memory(self.load_reg16(addr)));
                 }
                 MicroOp::RotateLeftThroughCarry { reg, set_zero } => {
                     let value = self.load_reg8(reg);
@@ -476,6 +484,46 @@ impl<M: Memory> CPU<M> {
                 }
             }
         }
+    }
+
+    fn compare_a(&mut self, with: u8) {
+        let a_value = self.reg_a;
+        let (res, carry) = a_value.overflowing_sub(with);
+
+        let mut flags = Flags::NEGATIVE;
+        if res == 0 {
+            flags |= Flags::ZERO;
+        }
+
+        if check_half_carry_sub(a_value, with) {
+            flags |= Flags::HALF_CARRY;
+        }
+
+        if carry {
+            flags |= Flags::CARRY;
+        }
+        self.flags = flags;
+    }
+
+    fn update_flags_arith(&mut self, res: u8, negative: bool, carry: bool, half_carry: bool) {
+        let mut flags = Flags::empty();
+        if res == 0 {
+            flags |= Flags::ZERO;
+        }
+
+        if negative {
+            flags |= Flags::NEGATIVE;
+        }
+
+        if carry {
+            flags |= Flags::CARRY;
+        }
+
+        if half_carry {
+            flags |= Flags::HALF_CARRY;
+        }
+
+        self.flags = flags;
     }
 }
 
