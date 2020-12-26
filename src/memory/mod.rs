@@ -1,12 +1,26 @@
 #[derive(Debug, Clone)]
 pub struct MMU {
-    mem: Box<[u8; 0x10000]>,
+    rom: Box<[u8; 0x8000]>,
+    vram: Box<[u8; 0x2000]>,
+    eram: Box<[u8; 0x2000]>,
+    wram: Box<[u8; 0x2000]>,
+    oam: Box<[u8; 0xA0]>,
+    io_regs: Box<[u8; 0x80]>,
+    hram: Box<[u8; 0x7F]>,
+    ie_reg: u8,
 }
 
 impl MMU {
     pub fn new() -> Self {
         MMU {
-            mem: Box::new([0; 0x10000]),
+            rom: Box::new([0; 0x8000]),
+            vram: Box::new([0; 0x2000]),
+            eram: Box::new([0; 0x2000]),
+            wram: Box::new([0; 0x2000]),
+            oam: Box::new([0; 0xA0]),
+            io_regs: Box::new([0; 0x80]),
+            hram: Box::new([0; 0x7F]),
+            ie_reg: 0,
         }
     }
 
@@ -17,10 +31,32 @@ impl MMU {
     }
 
     pub fn read_memory(&self, addr: u16) -> u8 {
-        self.mem[addr as usize]
+        match addr {
+            0x0000..=0x7FFF => self.rom[addr as usize],
+            0x8000..=0x9FFF => self.vram[addr as usize - 0x8000],
+            0xA000..=0xBFFF => self.eram[addr as usize - 0xA000],
+            0xC000..=0xDFFF => self.wram[addr as usize - 0xC000],
+            0xE000..=0xFDFF => self.wram[addr as usize - 0xE000],
+            0xFE00..=0xFE9F => self.oam[addr as usize - 0xFE00],
+            0xFEA0..=0xFEFF => panic!("Unusable space"),
+            0xFF00..=0xFF7F => self.io_regs[addr as usize - 0xFF00],
+            0xFF80..=0xFFFE => self.hram[addr as usize - 0xFF80],
+            0xFFFF => self.ie_reg,
+        }
     }
 
     pub fn write_memory(&mut self, addr: u16, value: u8) {
-        self.mem[addr as usize] = value;
+        match addr {
+            0x0000..=0x7FFF => self.rom[addr as usize] = value,
+            0x8000..=0x9FFF => self.vram[addr as usize - 0x8000] = value,
+            0xA000..=0xBFFF => self.eram[addr as usize - 0xA000] = value,
+            0xC000..=0xDFFF => self.wram[addr as usize - 0xC000] = value,
+            0xE000..=0xFDFF => self.wram[addr as usize - 0xE000] = value,
+            0xFE00..=0xFE9F => self.oam[addr as usize - 0xFE00] = value,
+            0xFEA0..=0xFEFF => panic!("Unusable space"),
+            0xFF00..=0xFF7F => self.io_regs[addr as usize - 0xFF00] = value,
+            0xFF80..=0xFFFE => self.hram[addr as usize - 0xFF80] = value,
+            0xFFFF => self.ie_reg = value,
+        }
     }
 }
