@@ -2,6 +2,7 @@ use std::thread::current;
 
 use crate::memory::Memory;
 use bitflags::bitflags;
+use log::debug;
 
 bitflags! {
     pub struct ControlReg: u8 {
@@ -25,6 +26,7 @@ pub struct PPU<M: Memory> {
 const SCREEN_HEIGHT: u8 = 144;
 const SCAN_LINE_COUNT: u8 = SCREEN_HEIGHT + 10;
 const DOT_PER_LINE_COUNT: u32 = 80 + 172 + 204;
+const HBLANK_START: u32 = 172 + 80;
 
 const LCD_CONTROL_REG_ADDR: u16 = 0xFF40;
 const LCD_STATUS_REG_ADDR: u16 = 0xFF41;
@@ -44,8 +46,12 @@ impl<M: Memory> PPU<M> {
             .expect("Failed to read control_reg")
     }
 
+    fn current_line(&self) -> u8 {
+        self.memory.read_memory(LCD_LY_ADDR)
+    }
+
     fn next_dot(&mut self) {
-        let mut current_line = self.memory.read_memory(LCD_LY_ADDR);
+        let mut current_line = self.current_line();
         self.current_dot_in_line += 1;
 
         if self.current_dot_in_line == DOT_PER_LINE_COUNT {
@@ -58,14 +64,13 @@ impl<M: Memory> PPU<M> {
         }
 
         // update status reg
-        let coincidence =
-            self.memory.read_memory(LCD_LY_ADDR) == self.memory.read_memory(LCD_LYC_ADDR);
+        let coincidence = self.current_line() == self.memory.read_memory(LCD_LYC_ADDR);
 
         let mode = if current_line >= SCREEN_HEIGHT {
             1 // V-blank
         } else if self.current_dot_in_line < 80 {
             2 // Search OAM
-        } else if self.current_dot_in_line < (80 + 172) {
+        } else if self.current_dot_in_line < HBLANK_START {
             3 // Transfer data to LCD
         } else {
             0 // H-blank
@@ -78,6 +83,16 @@ impl<M: Memory> PPU<M> {
     }
 
     fn cycle(&mut self) {
+        if self.current_line() >= SCREEN_HEIGHT {
+            debug!("V-Blank");
+        } else if self.current_dot_in_line == 0 {
+            debug!("Start OAM search");
+        } else if self.current_dot_in_line == 80 {
+            debug!("Start updating frame");
+        } else if self.current_dot_in_line == HBLANK_START {
+            debug!("Start H-Blank")
+        }
+
         self.next_dot();
     }
 
