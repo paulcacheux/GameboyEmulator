@@ -20,6 +20,10 @@ pub enum Instruction {
     XorAReg8 {
         reg: Register8,
     },
+    WriteMemLit {
+        addr: u16,
+        reg: Register8,
+    },
     WriteMem {
         addr: Register16,
         reg: Register8,
@@ -37,6 +41,10 @@ pub enum Instruction {
         reg: Register8,
         addr: Register16,
     },
+    ReadMemZeroPageLit {
+        lit_offset: u8,
+        reg: Register8,
+    },
     PushReg16 {
         reg: Register16,
     },
@@ -52,7 +60,7 @@ pub enum Instruction {
     },
     Return,
     JumpRelative {
-        condition: JumpCondition,
+        condition: Option<JumpCondition>,
         offset: i8,
     },
     IncReg16 {
@@ -63,6 +71,9 @@ pub enum Instruction {
     },
     DecReg8 {
         reg: Register8,
+    },
+    CompareLit {
+        literal: u8,
     },
     RotateLeftThroughCarryA,
     RotateLeftThroughCarry {
@@ -122,6 +133,9 @@ impl fmt::Display for Instruction {
             Instruction::XorAReg8 { reg } => {
                 write!(f, "XOR A, {}", reg)
             }
+            Instruction::WriteMemLit { addr, reg } => {
+                write!(f, "LD (${:04x}), {}", addr, reg)
+            }
             Instruction::WriteMem { addr, reg, post_op } => match post_op {
                 Some(PrePostOperation::Dec) => {
                     write!(f, "LD ({}-), {}", addr, reg)
@@ -142,6 +156,9 @@ impl fmt::Display for Instruction {
             Instruction::ReadMem { reg, addr } => {
                 write!(f, "LD {}, ({})", reg, addr)
             }
+            Instruction::ReadMemZeroPageLit { lit_offset, reg } => {
+                write!(f, "LD {}, ($FF00 + ${:02x})", reg, lit_offset)
+            }
             Instruction::PushReg16 { reg } => {
                 write!(f, "PUSH {}", reg)
             }
@@ -152,7 +169,11 @@ impl fmt::Display for Instruction {
             Instruction::CallAddr { addr } => write!(f, "CALL ${:04x}", addr),
             Instruction::Return => write!(f, "RET"),
             Instruction::JumpRelative { condition, offset } => {
-                write!(f, "JR {}, {}", condition, offset) // TODO: change the offset format
+                if let Some(cond) = condition {
+                    write!(f, "JR {}, {}", cond, offset) // TODO: change the offset format
+                } else {
+                    write!(f, "JR {}", offset) // TODO: change the offset format
+                }
             }
             Instruction::IncReg16 { reg } => {
                 write!(f, "INC {}", reg)
@@ -162,6 +183,9 @@ impl fmt::Display for Instruction {
             }
             Instruction::DecReg8 { reg } => {
                 write!(f, "DEC {}", reg)
+            }
+            Instruction::CompareLit { literal } => {
+                write!(f, "CP ${:02x}", literal)
             }
             Instruction::RotateLeftThroughCarryA => {
                 write!(f, "RLA")
@@ -197,6 +221,14 @@ impl Instruction {
             Instruction::XorAReg8 { reg } => {
                 vec![MicroOp::XorAReg { reg }]
             }
+            Instruction::WriteMemLit { addr, reg } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::WriteMemLit { addr, reg },
+                ]
+            }
             Instruction::WriteMem { addr, reg, post_op } => {
                 vec![
                     MicroOp::NOP,
@@ -216,9 +248,20 @@ impl Instruction {
                 vec![
                     MicroOp::NOP,
                     MicroOp::NOP,
-                    MicroOp::WriteMemZeroPageLit { lit_offset, reg },
+                    MicroOp::WriteMemLit {
+                        addr: 0xFF00 + lit_offset as u16,
+                        reg,
+                    },
                 ]
             }
+            Instruction::ReadMemZeroPageLit { lit_offset, reg } => vec![
+                MicroOp::NOP,
+                MicroOp::NOP,
+                MicroOp::ReadMemLit {
+                    reg,
+                    addr: 0xFF00 + lit_offset as u16,
+                },
+            ],
             Instruction::ReadMem { reg, addr } => {
                 vec![
                     MicroOp::NOP,
@@ -297,12 +340,19 @@ impl Instruction {
             ],
             Instruction::JumpRelative { condition, offset } => vec![
                 MicroOp::NOP,
-                MicroOp::CheckFlags(condition),
+                if let Some(cond) = condition {
+                    MicroOp::CheckFlags(cond)
+                } else {
+                    MicroOp::NOP
+                },
                 MicroOp::RelativeJump(offset),
             ],
             Instruction::IncReg16 { reg } => vec![MicroOp::NOP, MicroOp::IncReg16 { reg }],
             Instruction::IncReg8 { reg } => vec![MicroOp::IncReg { reg }],
             Instruction::DecReg8 { reg } => vec![MicroOp::DecReg { reg }],
+            Instruction::CompareLit { literal } => {
+                vec![MicroOp::NOP, MicroOp::CompareALit { literal }]
+            }
             Instruction::RotateLeftThroughCarryA => vec![MicroOp::RotateLeftThroughCarry {
                 reg: Register8::A,
                 set_zero: false,
@@ -338,6 +388,10 @@ pub enum MicroOp {
     XorAReg {
         reg: Register8,
     },
+    WriteMemLit {
+        addr: u16,
+        reg: Register8,
+    },
     WriteMem {
         addr: Register16,
         reg: Register8,
@@ -348,9 +402,9 @@ pub enum MicroOp {
         reg_offset: Register8,
         reg: Register8,
     },
-    WriteMemZeroPageLit {
-        lit_offset: u8,
+    ReadMemLit {
         reg: Register8,
+        addr: u16,
     },
     ReadMem {
         reg: Register8,
@@ -369,6 +423,9 @@ pub enum MicroOp {
     },
     DecReg {
         reg: Register8,
+    },
+    CompareALit {
+        literal: u8,
     },
     RotateLeftThroughCarry {
         reg: Register8,

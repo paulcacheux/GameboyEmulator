@@ -143,12 +143,14 @@ impl CPU {
 
         match opcode {
             0x00 => Instruction::NOP,
+            0x04 => Instruction::IncReg8 { reg: Register8::B },
             0x05 => Instruction::DecReg8 { reg: Register8::B },
             0x06 => Instruction::LoadRegLit8bits {
                 reg: Register8::B,
                 literal: self.fetch_and_advance(),
             },
             0x0C => Instruction::IncReg8 { reg: Register8::C },
+            0x0D => Instruction::DecReg8 { reg: Register8::C },
             0x0E => Instruction::LoadRegLit8bits {
                 reg: Register8::C,
                 literal: self.fetch_and_advance(),
@@ -161,12 +163,20 @@ impl CPU {
                 reg: Register16::DE,
             },
             0x17 => Instruction::RotateLeftThroughCarryA,
+            0x18 => Instruction::JumpRelative {
+                condition: None,
+                offset: self.fetch_and_advance() as i8,
+            },
             0x1A => Instruction::ReadMem {
                 addr: Register16::DE,
                 reg: Register8::A,
             },
+            0x1E => Instruction::LoadRegLit8bits {
+                reg: Register8::E,
+                literal: self.fetch_and_advance(),
+            },
             0x20 => Instruction::JumpRelative {
-                condition: JumpCondition::NonZero,
+                condition: Some(JumpCondition::NonZero),
                 offset: self.fetch_and_advance() as i8,
             },
             0x21 => Instruction::LoadRegLit16bits {
@@ -181,6 +191,14 @@ impl CPU {
             0x23 => Instruction::IncReg16 {
                 reg: Register16::HL,
             },
+            0x28 => Instruction::JumpRelative {
+                condition: Some(JumpCondition::Zero),
+                offset: self.fetch_and_advance() as i8,
+            },
+            0x2E => Instruction::LoadRegLit8bits {
+                reg: Register8::L,
+                literal: self.fetch_and_advance(),
+            },
             0x31 => Instruction::LoadRegLit16bits {
                 reg: Register16::SP,
                 literal: self.fetch_and_advance_u16(),
@@ -190,12 +208,21 @@ impl CPU {
                 reg: Register8::A,
                 post_op: Some(PrePostOperation::Dec),
             },
+            0x3D => Instruction::DecReg8 { reg: Register8::A },
             0x3E => Instruction::LoadRegLit8bits {
                 reg: Register8::A,
                 literal: self.fetch_and_advance(),
             },
             0x4F => Instruction::Move {
                 dest: Register8::C,
+                src: Register8::A,
+            },
+            0x57 => Instruction::Move {
+                dest: Register8::D,
+                src: Register8::A,
+            },
+            0x67 => Instruction::Move {
+                dest: Register8::H,
                 src: Register8::A,
             },
             0x7B => Instruction::Move {
@@ -243,6 +270,17 @@ impl CPU {
                 reg_offset: Register8::C,
                 reg: Register8::A,
             },
+            0xEA => Instruction::WriteMemLit {
+                addr: self.fetch_and_advance_u16(),
+                reg: Register8::A,
+            },
+            0xF0 => Instruction::ReadMemZeroPageLit {
+                reg: Register8::A,
+                lit_offset: self.fetch_and_advance(),
+            },
+            0xFE => Instruction::CompareLit {
+                literal: self.fetch_and_advance(),
+            },
             _ => panic!("Unknown opcode {:#x}", opcode),
         }
     }
@@ -287,6 +325,9 @@ impl CPU {
                         Flags::empty()
                     };
                 }
+                MicroOp::WriteMemLit { addr, reg } => {
+                    self.mmu.write_memory(addr, self.load_reg8(reg));
+                }
                 MicroOp::WriteMem {
                     addr,
                     reg,
@@ -302,9 +343,9 @@ impl CPU {
                     let addr_value = 0xFF00 + self.load_reg8(reg_offset) as u16;
                     self.mmu.write_memory(addr_value, self.load_reg8(reg));
                 }
-                MicroOp::WriteMemZeroPageLit { lit_offset, reg } => {
-                    let addr_value = 0xFF00 + lit_offset as u16;
-                    self.mmu.write_memory(addr_value, self.load_reg8(reg));
+                MicroOp::ReadMemLit { reg, addr } => {
+                    let mem_value = self.mmu.read_memory(addr);
+                    self.store_reg8(reg, mem_value);
                 }
                 MicroOp::ReadMem { reg, addr, post_op } => {
                     let addr_value = self.load_reg16(addr);
@@ -357,7 +398,7 @@ impl CPU {
                 }
                 MicroOp::DecReg { reg } => {
                     let reg_value = self.load_reg8(reg);
-                    let half_carry = check_half_carry(reg_value, u8::MIN);
+                    let half_carry = check_half_carry_sub(reg_value, 1);
                     let new_value = reg_value.wrapping_sub(1);
                     self.store_reg8(reg, new_value);
                     let mut flags = Flags::NEGATIVE;
@@ -368,6 +409,24 @@ impl CPU {
                         flags |= Flags::HALF_CARRY;
                     }
                     flags |= self.flags & Flags::CARRY;
+                    self.flags = flags;
+                }
+                MicroOp::CompareALit { literal } => {
+                    let a_value = self.load_reg8(Register8::A);
+                    let (res, carry) = a_value.overflowing_sub(literal);
+
+                    let mut flags = Flags::NEGATIVE;
+                    if res == 0 {
+                        flags |= Flags::ZERO;
+                    }
+
+                    if check_half_carry_sub(a_value, literal) {
+                        flags |= Flags::HALF_CARRY;
+                    }
+
+                    if carry {
+                        flags |= Flags::CARRY;
+                    }
                     self.flags = flags;
                 }
                 MicroOp::RotateLeftThroughCarry { reg, set_zero } => {
@@ -392,4 +451,9 @@ impl CPU {
 
 fn check_half_carry(a: u8, b: u8) -> bool {
     (((a & 0xf) + (b & 0xf)) & 0x10) == 0x10
+}
+
+fn check_half_carry_sub(a: u8, b: u8) -> bool {
+    let neg_b = u8::MAX.wrapping_sub(b).wrapping_add(1);
+    check_half_carry(a, neg_b)
 }
