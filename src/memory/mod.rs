@@ -1,3 +1,5 @@
+use std::{rc::Rc, sync::RwLock};
+
 #[derive(Debug, Clone)]
 pub struct MMU {
     rom: Box<[u8; 0x8000]>,
@@ -23,14 +25,10 @@ impl MMU {
             ie_reg: 0,
         }
     }
+}
 
-    pub fn write_slice(&mut self, slice: &[u8], start_addr: u16) {
-        for (i, value) in slice.iter().enumerate() {
-            self.write_memory(start_addr + i as u16, *value);
-        }
-    }
-
-    pub fn read_memory(&self, addr: u16) -> u8 {
+impl Memory for MMU {
+    fn read_memory(&self, addr: u16) -> u8 {
         match addr {
             0x0000..=0x7FFF => self.rom[addr as usize],
             0x8000..=0x9FFF => self.vram[addr as usize - 0x8000],
@@ -45,7 +43,7 @@ impl MMU {
         }
     }
 
-    pub fn write_memory(&mut self, addr: u16, value: u8) {
+    fn write_memory(&mut self, addr: u16, value: u8) {
         match addr {
             0x0000..=0x7FFF => self.rom[addr as usize] = value,
             0x8000..=0x9FFF => self.vram[addr as usize - 0x8000] = value,
@@ -58,5 +56,30 @@ impl MMU {
             0xFF80..=0xFFFE => self.hram[addr as usize - 0xFF80] = value,
             0xFFFF => self.ie_reg = value,
         }
+    }
+}
+
+pub trait Memory {
+    fn read_memory(&self, addr: u16) -> u8;
+    fn write_memory(&mut self, addr: u16, value: u8);
+
+    fn write_slice(&mut self, slice: &[u8], start_addr: u16) {
+        for (i, value) in slice.iter().enumerate() {
+            self.write_memory(start_addr + i as u16, *value);
+        }
+    }
+}
+
+impl<M: Memory> Memory for Rc<RwLock<M>> {
+    fn read_memory(&self, addr: u16) -> u8 {
+        self.read().unwrap().read_memory(addr)
+    }
+
+    fn write_memory(&mut self, addr: u16, value: u8) {
+        self.write().unwrap().write_memory(addr, value);
+    }
+
+    fn write_slice(&mut self, slice: &[u8], start_addr: u16) {
+        self.write().unwrap().write_slice(slice, start_addr);
     }
 }

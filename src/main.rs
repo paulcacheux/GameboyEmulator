@@ -1,10 +1,15 @@
+use std::{rc::Rc, sync::RwLock};
+
+use ppu::PPU;
 use simple_logger::SimpleLogger;
 
 mod cpu;
 mod memory;
+mod ppu;
 mod utils;
 
 use cpu::CPU;
+use memory::Memory;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     SimpleLogger::new().init()?;
@@ -13,10 +18,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rom_content = std::fs::read(&rom_path)?;
 
     let mut mmu = memory::MMU::new();
-    mmu.write_slice(&rom_content, 0x0);
+    if rom_path.contains("DMG_ROM") {
+        mmu.write_slice(&rom_content, 0x0);
+    } else {
+        mmu.write_slice(&rom_content, 0x100);
+    }
 
-    let mut cpu = CPU::new(mmu);
+    let memory = Rc::new(RwLock::new(mmu));
+
+    let mut cpu = CPU::new(memory.clone());
+    let mut ppu = PPU::new(memory);
+
     loop {
         cpu.step();
+        ppu.step();
     }
 }

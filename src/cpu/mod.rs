@@ -1,4 +1,4 @@
-use crate::{memory::MMU, utils::combine};
+use crate::{memory::Memory, utils::combine};
 use bitflags::bitflags;
 use std::collections::VecDeque;
 
@@ -20,8 +20,8 @@ bitflags! {
 }
 
 #[derive(Debug, Clone)]
-pub struct CPU {
-    mmu: MMU,
+pub struct CPU<M: Memory> {
+    memory: M,
 
     reg_a: u8,
     reg_b: u8,
@@ -39,10 +39,10 @@ pub struct CPU {
     pipeline: VecDeque<MicroOp>,
 }
 
-impl CPU {
-    pub fn new(mmu: MMU) -> Self {
+impl<M: Memory> CPU<M> {
+    pub fn new(memory: M) -> Self {
         CPU {
-            mmu,
+            memory,
             reg_a: 0,
             reg_b: 0,
             reg_c: 0,
@@ -127,7 +127,7 @@ impl CPU {
     }
 
     pub fn fetch_and_advance(&mut self) -> u8 {
-        let byte = self.mmu.read_memory(self.pc);
+        let byte = self.memory.read_memory(self.pc);
         self.pc += 1;
         byte
     }
@@ -326,7 +326,7 @@ impl CPU {
                     };
                 }
                 MicroOp::WriteMemLit { addr, reg } => {
-                    self.mmu.write_memory(addr, self.load_reg8(reg));
+                    self.memory.write_memory(addr, self.load_reg8(reg));
                 }
                 MicroOp::WriteMem {
                     addr,
@@ -336,20 +336,20 @@ impl CPU {
                 } => {
                     self.run_pre_post_op(addr, pre_op);
                     let addr_value = self.load_reg16(addr);
-                    self.mmu.write_memory(addr_value, self.load_reg8(reg));
+                    self.memory.write_memory(addr_value, self.load_reg8(reg));
                     self.run_pre_post_op(addr, post_op);
                 }
                 MicroOp::WriteMemZeroPage { reg_offset, reg } => {
                     let addr_value = 0xFF00 + self.load_reg8(reg_offset) as u16;
-                    self.mmu.write_memory(addr_value, self.load_reg8(reg));
+                    self.memory.write_memory(addr_value, self.load_reg8(reg));
                 }
                 MicroOp::ReadMemLit { reg, addr } => {
-                    let mem_value = self.mmu.read_memory(addr);
+                    let mem_value = self.memory.read_memory(addr);
                     self.store_reg8(reg, mem_value);
                 }
                 MicroOp::ReadMem { reg, addr, post_op } => {
                     let addr_value = self.load_reg16(addr);
-                    let mem_value = self.mmu.read_memory(addr_value);
+                    let mem_value = self.memory.read_memory(addr_value);
                     self.store_reg8(reg, mem_value);
                     self.run_pre_post_op(addr, post_op);
                 }
