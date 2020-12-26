@@ -162,6 +162,7 @@ impl<M: Memory> CPU<M> {
             0x13 => Instruction::IncReg16 {
                 reg: Register16::DE,
             },
+            0x15 => Instruction::DecReg8 { reg: Register8::D },
             0x17 => Instruction::RotateLeftThroughCarryA,
             0x18 => Instruction::JumpRelative {
                 condition: None,
@@ -171,6 +172,7 @@ impl<M: Memory> CPU<M> {
                 addr: Register16::DE,
                 reg: Register8::A,
             },
+            0x1D => Instruction::DecReg8 { reg: Register8::E },
             0x1E => Instruction::LoadRegLit8bits {
                 reg: Register8::E,
                 literal: self.fetch_and_advance(),
@@ -191,6 +193,7 @@ impl<M: Memory> CPU<M> {
             0x23 => Instruction::IncReg16 {
                 reg: Register16::HL,
             },
+            0x24 => Instruction::IncReg8 { reg: Register8::H },
             0x28 => Instruction::JumpRelative {
                 condition: Some(JumpCondition::Zero),
                 offset: self.fetch_and_advance() as i8,
@@ -229,11 +232,16 @@ impl<M: Memory> CPU<M> {
                 dest: Register8::A,
                 src: Register8::E,
             },
+            0x7C => Instruction::Move {
+                dest: Register8::A,
+                src: Register8::H,
+            },
             0x77 => Instruction::WriteMem {
                 addr: Register16::HL,
                 reg: Register8::A,
                 post_op: None,
             },
+            0x90 => Instruction::SubAReg8 { reg: Register8::B },
             0xA8 => Instruction::XorAReg8 { reg: Register8::B },
             0xA9 => Instruction::XorAReg8 { reg: Register8::C },
             0xAA => Instruction::XorAReg8 { reg: Register8::D },
@@ -325,6 +333,28 @@ impl<M: Memory> CPU<M> {
                         Flags::empty()
                     };
                 }
+                MicroOp::SubAReg { reg } => {
+                    let a_value = self.reg_a;
+                    let rhs_value = self.load_reg8(reg);
+                    let (res, carry) = a_value.overflowing_sub(rhs_value);
+                    let half_carry = check_half_carry_sub(a_value, rhs_value);
+
+                    let mut flags = Flags::NEGATIVE;
+                    if carry {
+                        flags |= Flags::CARRY;
+                    }
+
+                    if half_carry {
+                        flags |= Flags::HALF_CARRY;
+                    }
+
+                    if res == 0 {
+                        flags |= Flags::ZERO;
+                    }
+
+                    self.reg_a = res;
+                    self.flags = flags;
+                }
                 MicroOp::WriteMemLit { addr, reg } => {
                     self.memory.write_memory(addr, self.load_reg8(reg));
                 }
@@ -412,7 +442,7 @@ impl<M: Memory> CPU<M> {
                     self.flags = flags;
                 }
                 MicroOp::CompareALit { literal } => {
-                    let a_value = self.load_reg8(Register8::A);
+                    let a_value = self.reg_a;
                     let (res, carry) = a_value.overflowing_sub(literal);
 
                     let mut flags = Flags::NEGATIVE;

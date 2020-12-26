@@ -20,6 +20,9 @@ pub enum Instruction {
     XorAReg8 {
         reg: Register8,
     },
+    SubAReg8 {
+        reg: Register8,
+    },
     WriteMemLit {
         addr: u16,
         reg: Register8,
@@ -133,6 +136,9 @@ impl fmt::Display for Instruction {
             Instruction::XorAReg8 { reg } => {
                 write!(f, "XOR A, {}", reg)
             }
+            Instruction::SubAReg8 { reg } => {
+                write!(f, "SUB A, {}", reg)
+            }
             Instruction::WriteMemLit { addr, reg } => {
                 write!(f, "LD (${:04x}), {}", addr, reg)
             }
@@ -220,6 +226,9 @@ impl Instruction {
             }
             Instruction::XorAReg8 { reg } => {
                 vec![MicroOp::XorAReg { reg }]
+            }
+            Instruction::SubAReg8 { reg } => {
+                vec![MicroOp::SubAReg { reg }]
             }
             Instruction::WriteMemLit { addr, reg } => {
                 vec![
@@ -386,6 +395,9 @@ pub enum MicroOp {
         literal: u16,
     },
     XorAReg {
+        reg: Register8,
+    },
+    SubAReg {
         reg: Register8,
     },
     WriteMemLit {
