@@ -46,6 +46,8 @@ pub enum Register8 {
     L,
     SPHigh,
     SPLow,
+    PCHigh,
+    PCLow,
 }
 
 impl fmt::Display for Register16 {
@@ -99,6 +101,12 @@ impl fmt::Display for Register8 {
             }
             Register8::SPLow => {
                 write!(f, "SP[low]")
+            }
+            Register8::PCHigh => {
+                write!(f, "PC[high]")
+            }
+            Register8::PCLow => {
+                write!(f, "PC[low]")
             }
         }
     }

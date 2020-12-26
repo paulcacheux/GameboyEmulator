@@ -19,6 +19,4 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         cpu.step();
     }
-
-    Ok(())
 }
