@@ -6,6 +6,7 @@ pub struct Fetcher {
     addressing_mode: AddressingMode,
     tile_x: u8,
     tile_y: u8,
+    sub_y: u8,
 }
 
 impl Fetcher {
@@ -18,12 +19,14 @@ impl Fetcher {
     ) -> Self {
         let tile_x = scroll_x / 8;
         let tile_y = ((scan_line + scroll_y) & 0xFF) / 8;
+        let sub_y = (scan_line + scroll_y) % 8;
 
         Fetcher {
             map_addr,
             addressing_mode,
             tile_x,
             tile_y,
+            sub_y,
         }
     }
 
@@ -31,7 +34,7 @@ impl Fetcher {
         let offset = self.tile_y * 32 + self.tile_x;
         let tile_id = memory.read_memory(self.map_addr) + offset;
 
-        let addr = match self.addressing_mode {
+        let tile_addr = match self.addressing_mode {
             AddressingMode::From8000 => 0x8000 + (tile_id as u16) * 16,
             AddressingMode::From8800 => {
                 let tile_id = tile_id as i8;
@@ -43,8 +46,10 @@ impl Fetcher {
             }
         };
 
-        let byte1 = memory.read_memory(addr);
-        let byte2 = memory.read_memory(addr + 1);
+        let row_addr = tile_addr + (self.sub_y as u16) * 2;
+
+        let byte1 = memory.read_memory(row_addr);
+        let byte2 = memory.read_memory(row_addr + 1);
 
         let mut pixels = [Pixel {
             color: 0,

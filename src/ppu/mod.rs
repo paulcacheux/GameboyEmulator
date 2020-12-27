@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::memory::Memory;
+use crate::{interrupt::InterruptControllerPtr, memory::Memory};
 use bitflags::bitflags;
 
 mod fetcher;
@@ -19,17 +19,8 @@ bitflags! {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct PPU<M: Memory> {
-    memory: M,
-    current_dot_in_line: u32,
-    frame: [u8; PIXEL_COUNT],
-    fetcher: FetcherState,
-    fifo: VecDeque<Pixel>,
-}
-
-const SCREEN_WIDTH: u8 = 160;
-const SCREEN_HEIGHT: u8 = 144;
+pub const SCREEN_WIDTH: u8 = 160;
+pub const SCREEN_HEIGHT: u8 = 144;
 const PIXEL_COUNT: usize = (SCREEN_WIDTH as usize) * (SCREEN_HEIGHT as usize);
 
 const SCAN_LINE_COUNT: u8 = SCREEN_HEIGHT + 10;
@@ -44,14 +35,44 @@ const LCD_LY_ADDR: u16 = 0xFF44;
 const LCD_LYC_ADDR: u16 = 0xFF45;
 const BG_PALETTE_DATA_ADDR: u16 = 0xFF47;
 
+#[derive(Debug, Clone)]
+pub struct PPU<M: Memory> {
+    memory: M,
+    interrupt_controller: InterruptControllerPtr,
+    current_dot_in_line: u32,
+    previous_frame: [u8; PIXEL_COUNT],
+    frame: [u8; PIXEL_COUNT],
+    fetcher: FetcherState,
+    fifo: VecDeque<Pixel>,
+}
+
 impl<M: Memory> PPU<M> {
-    pub fn new(memory: M) -> Self {
+    pub fn new(memory: M, interrupt_controller: InterruptControllerPtr) -> Self {
         PPU {
             memory,
+            interrupt_controller,
             current_dot_in_line: 0,
+            previous_frame: [0; PIXEL_COUNT],
             frame: [0; PIXEL_COUNT],
             fetcher: FetcherState::Waiting,
             fifo: VecDeque::new(),
+        }
+    }
+
+    pub fn draw_into_fb(&self, fb: &mut [u8]) {
+        assert_eq!(PIXEL_COUNT * 4, fb.len());
+
+        for (i, pixel) in fb.chunks_exact_mut(4).enumerate() {
+            let color = self.previous_frame[i];
+            let screen_color = match color {
+                0 => [150, 182, 15, 255],
+                1 => [135, 167, 15, 255],
+                2 => [46, 95, 46, 255],
+                3 => [15, 54, 15, 255],
+                _ => panic!("Out of range color"),
+            };
+
+            pixel.copy_from_slice(&screen_color);
         }
     }
 
@@ -101,7 +122,8 @@ impl<M: Memory> PPU<M> {
     }
 
     fn prepare_frame_and_fetcher(&mut self) {
-        for pixel in &mut self.frame {
+        for (i, pixel) in self.frame.iter_mut().enumerate() {
+            self.previous_frame[i] = *pixel;
             *pixel = 0;
         }
 
@@ -119,6 +141,11 @@ impl<M: Memory> PPU<M> {
         self.update_status_reg();
 
         let current_mode = self.current_mode();
+        self.interrupt_controller
+            .lock()
+            .unwrap()
+            .ppu_mode_update(current_mode);
+
         match current_mode {
             Mode::HBlank => {}
             Mode::VBlank => {}
@@ -170,7 +197,8 @@ impl<M: Memory> PPU<M> {
 }
 
 #[repr(u8)]
-enum Mode {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Mode {
     HBlank = 0,
     VBlank = 1,
     OAMSearch = 2,
