@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, io::BufWriter, writeln};
 
 use crate::{interrupt::InterruptControllerPtr, memory::Memory};
 use bitflags::bitflags;
@@ -40,8 +40,8 @@ pub struct PPU<M: Memory> {
     memory: M,
     interrupt_controller: InterruptControllerPtr,
     current_dot_in_line: u32,
-    previous_frame: [u8; PIXEL_COUNT],
-    frame: [u8; PIXEL_COUNT],
+    pub previous_frame: [u8; PIXEL_COUNT],
+    pub frame: [u8; PIXEL_COUNT],
     fetcher: FetcherState,
     fifo: VecDeque<Pixel>,
 }
@@ -64,15 +64,7 @@ impl<M: Memory> PPU<M> {
 
         for (i, pixel) in fb.chunks_exact_mut(4).enumerate() {
             let color = self.previous_frame[i];
-            let screen_color = match color {
-                0 => [150, 182, 15, 255],
-                1 => [135, 167, 15, 255],
-                2 => [46, 95, 46, 255],
-                3 => [15, 54, 15, 255],
-                _ => panic!("Out of range color"),
-            };
-
-            pixel.copy_from_slice(&screen_color);
+            pixel.copy_from_slice(&pixel_color_to_screen_color(color));
         }
     }
 
@@ -128,7 +120,7 @@ impl<M: Memory> PPU<M> {
         }
 
         self.fifo.clear();
-        self.next_fetcher_state();
+        self.fetcher = FetcherState::Waiting;
     }
 
     fn next_fetcher_state(&mut self) {
@@ -158,7 +150,7 @@ impl<M: Memory> PPU<M> {
                     let scan_line = self.current_line();
 
                     match &mut self.fetcher {
-                        FetcherState::Waiting => {}
+                        FetcherState::Waiting | FetcherState::Finished => {}
                         FetcherState::Ready(fetcher) => {
                             self.fifo.extend(&fetcher.fetch_pixels(&mut self.memory));
 
@@ -210,6 +202,7 @@ enum FetcherState {
     Waiting,
     Ready(Fetcher),
     Working(Fetcher, u8),
+    Finished,
 }
 
 impl Default for FetcherState {
@@ -242,11 +235,12 @@ impl FetcherState {
             FetcherState::Ready(fetcher) => FetcherState::Working(fetcher, 0),
             FetcherState::Working(fetcher, x) => {
                 if x + 1 == SCREEN_WIDTH {
-                    FetcherState::Waiting
+                    FetcherState::Finished
                 } else {
                     FetcherState::Working(fetcher, x + 1)
                 }
             }
+            FetcherState::Finished => FetcherState::Finished,
         }
     }
 
@@ -255,4 +249,71 @@ impl FetcherState {
         let next = current.next(lcdc, memory, scan_line);
         let _ = std::mem::replace(self, next);
     }
+}
+
+fn pixel_color_to_screen_color(color: u8) -> [u8; 4] {
+    match color {
+        0 => [150, 182, 15, 255],
+        1 => [135, 167, 15, 255],
+        2 => [46, 95, 46, 255],
+        3 => [15, 54, 15, 255],
+        _ => panic!("Out of range color"),
+    }
+}
+
+#[allow(dead_code)]
+pub fn dump_tiles_to_file(memory: &dyn Memory, path: &str) -> Result<(), std::io::Error> {
+    use std::io::Write;
+
+    let file = std::fs::File::create(path)?;
+    let mut writer = BufWriter::new(file);
+
+    let addresses: Vec<u16> = (0x8000..0x9800).collect();
+
+    writeln!(&mut writer, "P3")?;
+    writeln!(&mut writer, "8 {}", addresses.len() / 2)?;
+
+    for tile in addresses.chunks_exact(16) {
+        for byte_addresses in tile.chunks_exact(2) {
+            let low = memory.read_memory(byte_addresses[0]);
+            let high = memory.read_memory(byte_addresses[1]);
+            let pixels = fetcher::bytes_to_pixels(low, high, PixelSource::BackgroundWindow);
+
+            for pixel in &pixels {
+                let screen_color = pixel_color_to_screen_color(pixel.color);
+                for color_part in &screen_color[..3] {
+                    write!(&mut writer, "{} ", color_part)?;
+                }
+            }
+            writeln!(&mut writer)?;
+        }
+    }
+
+    Ok(())
+}
+
+#[allow(dead_code)]
+pub fn dump_frame_to_file(frame: &[u8], path: &str) -> Result<(), std::io::Error> {
+    use std::io::Write;
+
+    assert_eq!(frame.len(), PIXEL_COUNT);
+
+    let file = std::fs::File::create(path)?;
+    let mut writer = BufWriter::new(file);
+
+    writeln!(&mut writer, "P3")?;
+    writeln!(&mut writer, "{} {}", SCREEN_WIDTH, SCREEN_HEIGHT)?;
+
+    for y in 0..SCREEN_HEIGHT {
+        for x in 0..SCREEN_WIDTH {
+            let offset = (y as usize) * (SCREEN_WIDTH as usize) + (x as usize);
+            let screen_color = pixel_color_to_screen_color(frame[offset]);
+            for color_part in &screen_color[..3] {
+                write!(&mut writer, "{} ", color_part)?;
+            }
+            writeln!(&mut writer)?;
+        }
+    }
+
+    Ok(())
 }

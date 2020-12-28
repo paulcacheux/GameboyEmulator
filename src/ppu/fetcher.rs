@@ -20,6 +20,10 @@ impl Fetcher {
         let tile_x = scroll_x / 8;
         let tile_y = ((scan_line + scroll_y) & 0xFF) / 8;
         let sub_y = (scan_line + scroll_y) % 8;
+        /* println!(
+            "Init fetcher: tile_x = {}, tile_y = {}, sub_y = {}",
+            tile_x, tile_y, sub_y
+        ); */
 
         Fetcher {
             map_addr,
@@ -31,38 +35,28 @@ impl Fetcher {
     }
 
     pub fn fetch_pixels<M: Memory>(&mut self, memory: &mut M) -> [Pixel; 8] {
-        let offset = self.tile_y * 32 + self.tile_x;
-        let tile_id = memory.read_memory(self.map_addr) + offset;
+        let offset = (self.tile_y as u16) * 32 + (self.tile_x as u16);
+        let tile_id = memory.read_memory(self.map_addr + offset);
 
-        let tile_addr = match self.addressing_mode {
-            AddressingMode::From8000 => 0x8000 + (tile_id as u16) * 16,
+        let real_tile_id = match self.addressing_mode {
+            AddressingMode::From8000 => tile_id as u16,
             AddressingMode::From8800 => {
-                let tile_id = tile_id as i8;
-                if tile_id >= 0 {
-                    0x9000 + (tile_id as u16) * 16
+                if tile_id < 128 {
+                    tile_id as u16 + 256
                 } else {
-                    0x9000 - (-tile_id as u16) * 16
+                    tile_id as u16
                 }
             }
         };
+
+        let tile_addr = 0x8000 + real_tile_id * 16;
 
         let row_addr = tile_addr + (self.sub_y as u16) * 2;
 
         let byte1 = memory.read_memory(row_addr);
         let byte2 = memory.read_memory(row_addr + 1);
 
-        let mut pixels = [Pixel {
-            color: 0,
-            source: PixelSource::BackgroundWindow,
-        }; 8];
-
-        for (index, bit) in (0..8).rev().enumerate() {
-            let bit_low_value = (byte1 >> bit) & 0x1;
-            let bit_high_value = (byte2 >> bit) & 0x1;
-
-            let color_value = (bit_high_value << 1) | bit_low_value;
-            pixels[index].color = color_value;
-        }
+        let pixels = bytes_to_pixels(byte1, byte2, PixelSource::BackgroundWindow);
 
         self.tile_x = (self.tile_x + 1) % 32;
         pixels
@@ -84,4 +78,17 @@ pub enum PixelSource {
 pub enum AddressingMode {
     From8000,
     From8800,
+}
+
+pub fn bytes_to_pixels(low: u8, high: u8, source: PixelSource) -> [Pixel; 8] {
+    let mut pixels = [Pixel { color: 0, source }; 8];
+
+    for (index, bit) in (0..8).rev().enumerate() {
+        let bit_low_value = (low >> bit) & 0x1;
+        let bit_high_value = (high >> bit) & 0x1;
+
+        let color_value = (bit_high_value << 1) | bit_low_value;
+        pixels[index].color = color_value;
+    }
+    pixels
 }

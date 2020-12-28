@@ -34,7 +34,7 @@ pub struct CPU<M: Memory> {
     flags: Flags,
 
     sp: u16,
-    pc: u16,
+    pub pc: u16,
 
     pipeline: VecDeque<MicroOp>,
 }
