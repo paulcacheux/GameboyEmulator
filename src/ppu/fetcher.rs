@@ -17,9 +17,10 @@ impl Fetcher {
         scroll_y: u8,
         scan_line: u8,
     ) -> Self {
+        let total_y_scroll = scan_line.wrapping_add(scroll_y);
         let tile_x = scroll_x / 8;
-        let tile_y = ((scan_line + scroll_y) & 0xFF) / 8;
-        let sub_y = (scan_line + scroll_y) % 8;
+        let tile_y = total_y_scroll / 8;
+        let sub_y = total_y_scroll % 8;
         /* println!(
             "Init fetcher: tile_x = {}, tile_y = {}, sub_y = {}",
             tile_x, tile_y, sub_y
@@ -56,7 +57,7 @@ impl Fetcher {
         let byte1 = memory.read_memory(row_addr);
         let byte2 = memory.read_memory(row_addr + 1);
 
-        let pixels = bytes_to_pixels(byte1, byte2, PixelSource::BackgroundWindow);
+        let pixels = byte_pair_to_pixels(byte1, byte2, PixelSource::BackgroundWindow);
 
         self.tile_x = (self.tile_x + 1) % 32;
         pixels
@@ -80,7 +81,7 @@ pub enum AddressingMode {
     From8800,
 }
 
-pub fn bytes_to_pixels(low: u8, high: u8, source: PixelSource) -> [Pixel; 8] {
+pub fn byte_pair_to_pixels(low: u8, high: u8, source: PixelSource) -> [Pixel; 8] {
     let mut pixels = [Pixel { color: 0, source }; 8];
 
     for (index, bit) in (0..8).rev().enumerate() {

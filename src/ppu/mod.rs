@@ -169,7 +169,7 @@ impl<M: Memory> PPU<M> {
                                 (scan_line as usize) * (SCREEN_WIDTH as usize) + (*x as usize);
 
                             let bg_palette = self.memory.read_memory(BG_PALETTE_DATA_ADDR);
-                            let actual_color = bg_palette >> (pixel.color * 2) & 0b11;
+                            let actual_color = (bg_palette >> (pixel.color * 2)) & 0b11;
 
                             self.frame[offset] = actual_color;
                         }
@@ -277,7 +277,7 @@ pub fn dump_tiles_to_file(memory: &dyn Memory, path: &str) -> Result<(), std::io
         for byte_addresses in tile.chunks_exact(2) {
             let low = memory.read_memory(byte_addresses[0]);
             let high = memory.read_memory(byte_addresses[1]);
-            let pixels = fetcher::bytes_to_pixels(low, high, PixelSource::BackgroundWindow);
+            let pixels = fetcher::byte_pair_to_pixels(low, high, PixelSource::BackgroundWindow);
 
             for pixel in &pixels {
                 let screen_color = pixel_color_to_screen_color(pixel.color);
