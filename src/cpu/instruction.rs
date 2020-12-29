@@ -33,6 +33,9 @@ pub enum Instruction {
     XorAWithIndirect {
         addr: Register16,
     },
+    XorAWithLiteral {
+        literal: u8,
+    },
     AddAWithLiteral {
         literal: u8,
     },
@@ -121,6 +124,13 @@ pub enum Instruction {
         // different instruction because of flags
         reg: Register8,
     },
+    RotateRightThroughCarryA,
+    RotateRightThroughCarry {
+        reg: Register8,
+    },
+    ShiftRightIntoCarry {
+        reg: Register8,
+    },
     EnableInterrupts,
     DisableInterrupts,
 }
@@ -188,6 +198,9 @@ impl fmt::Display for Instruction {
             }
             Instruction::XorAWithIndirect { addr } => {
                 write!(f, "XOR A, ({})", addr)
+            }
+            Instruction::XorAWithLiteral { literal } => {
+                write!(f, "XOR A, ${:02x}", literal)
             }
             Instruction::AddAWithIndirect { addr } => {
                 write!(f, "ADD A, ({})", addr)
@@ -287,6 +300,15 @@ impl fmt::Display for Instruction {
             Instruction::RotateLeftThroughCarry { reg } => {
                 write!(f, "RL {}", reg)
             }
+            Instruction::RotateRightThroughCarryA => {
+                write!(f, "RRA")
+            }
+            Instruction::RotateRightThroughCarry { reg } => {
+                write!(f, "RR {}", reg)
+            }
+            Instruction::ShiftRightIntoCarry { reg } => {
+                write!(f, "SRL {}", reg)
+            }
             Instruction::EnableInterrupts => write!(f, "EI"),
             Instruction::DisableInterrupts => write!(f, "DI"),
         }
@@ -326,6 +348,14 @@ impl Instruction {
                     MicroOp::NOP,
                     MicroOp::XorA {
                         rhs: Source8bits::Indirect(addr),
+                    },
+                ]
+            }
+            Instruction::XorAWithLiteral { literal } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::XorA {
+                        rhs: literal.into(),
                     },
                 ]
             }
@@ -562,6 +592,22 @@ impl Instruction {
                         set_zero: true,
                     },
                 ]
+            }
+            Instruction::RotateRightThroughCarryA => vec![MicroOp::RotateRightThroughCarry {
+                reg: Register8::A,
+                set_zero: false,
+            }],
+            Instruction::RotateRightThroughCarry { reg } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::RotateRightThroughCarry {
+                        reg,
+                        set_zero: true,
+                    },
+                ]
+            }
+            Instruction::ShiftRightIntoCarry { reg } => {
+                vec![MicroOp::NOP, MicroOp::ShiftRightIntoCarry { reg }]
             }
             Instruction::EnableInterrupts => vec![MicroOp::EnableInterrupts],
             Instruction::DisableInterrupts => vec![MicroOp::DisableInterrupts],

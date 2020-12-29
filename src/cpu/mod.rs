@@ -1,4 +1,4 @@
-use crate::{main, memory::Memory, utils::combine};
+use crate::{memory::Memory, utils::combine};
 use bitflags::bitflags;
 use std::collections::VecDeque;
 
@@ -210,6 +210,7 @@ impl<M: Memory> CPU<M> {
                 reg: Register8::E,
                 literal: self.fetch_and_advance(),
             },
+            0x1F => Instruction::RotateRightThroughCarryA,
             0x20 => Instruction::JumpRelative {
                 condition: Some(JumpCondition::NonZero),
                 offset: self.fetch_and_advance() as i8,
@@ -246,6 +247,10 @@ impl<M: Memory> CPU<M> {
             0x2E => Instruction::LoadLiteralIntoReg8 {
                 reg: Register8::L,
                 literal: self.fetch_and_advance(),
+            },
+            0x30 => Instruction::JumpRelative {
+                condition: Some(JumpCondition::NonCarry),
+                offset: self.fetch_and_advance() as i8,
             },
             0x31 => Instruction::LoadLiteralIntoReg16 {
                 reg: Register16::SP,
@@ -292,9 +297,28 @@ impl<M: Memory> CPU<M> {
                 dest: Register8::D,
                 src: Register8::A,
             },
+            0x5F => Instruction::Move {
+                dest: Register8::E,
+                src: Register8::A,
+            },
             0x67 => Instruction::Move {
                 dest: Register8::H,
                 src: Register8::A,
+            },
+            0x70 => Instruction::WriteReg8ValueAtIndirect {
+                addr: Register16::HL,
+                reg: Register8::B,
+                post_op: None,
+            },
+            0x71 => Instruction::WriteReg8ValueAtIndirect {
+                addr: Register16::HL,
+                reg: Register8::C,
+                post_op: None,
+            },
+            0x72 => Instruction::WriteReg8ValueAtIndirect {
+                addr: Register16::HL,
+                reg: Register8::D,
+                post_op: None,
             },
             0x77 => Instruction::WriteReg8ValueAtIndirect {
                 addr: Register16::HL,
@@ -304,6 +328,14 @@ impl<M: Memory> CPU<M> {
             0x78 => Instruction::Move {
                 dest: Register8::A,
                 src: Register8::B,
+            },
+            0x79 => Instruction::Move {
+                dest: Register8::A,
+                src: Register8::C,
+            },
+            0x7A => Instruction::Move {
+                dest: Register8::A,
+                src: Register8::D,
             },
             0x7B => Instruction::Move {
                 dest: Register8::A,
@@ -357,6 +389,9 @@ impl<M: Memory> CPU<M> {
                 // prefix 0xCB:
                 match self.fetch_and_advance() {
                     0x11 => Instruction::RotateLeftThroughCarry { reg: Register8::C },
+                    0x19 => Instruction::RotateRightThroughCarry { reg: Register8::C },
+                    0x1A => Instruction::RotateRightThroughCarry { reg: Register8::D },
+                    0x38 => Instruction::ShiftRightIntoCarry { reg: Register8::B },
                     0x7C => Instruction::BitTest {
                         reg: Register8::H,
                         bit: 7,
@@ -367,6 +402,9 @@ impl<M: Memory> CPU<M> {
             0xCD => Instruction::CallAddr {
                 condition: None,
                 addr: self.fetch_and_advance_u16(),
+            },
+            0xD1 => Instruction::PopReg16 {
+                reg: Register16::DE,
             },
             0xD5 => Instruction::PushReg16 {
                 reg: Register16::DE,
@@ -394,6 +432,9 @@ impl<M: Memory> CPU<M> {
             0xEA => Instruction::WriteReg8ValueAtAddress {
                 addr: self.fetch_and_advance_u16(),
                 reg: Register8::A,
+            },
+            0xEE => Instruction::XorAWithLiteral {
+                literal: self.fetch_and_advance(),
             },
             0xF0 => Instruction::ReadZeroPageOffsetLiteralToReg8 {
                 reg: Register8::A,
@@ -609,14 +650,41 @@ impl<M: Memory> CPU<M> {
                     let new_value = (value << 1) | (self.flags.contains(Flags::CARRY) as u8);
                     self.store_reg8(reg, new_value);
 
-                    let mut flags = Flags::empty();
+                    self.flags = Flags::empty();
                     if new_carry {
-                        flags |= Flags::CARRY;
+                        self.flags |= Flags::CARRY;
                     }
                     if set_zero && new_value == 0 {
-                        flags |= Flags::ZERO;
+                        self.flags |= Flags::ZERO;
                     }
-                    self.flags = flags;
+                }
+                MicroOp::RotateRightThroughCarry { reg, set_zero } => {
+                    let value = self.load_reg8(reg);
+                    let new_carry = (value & 0x1) == 1;
+                    let new_value = ((self.flags.contains(Flags::CARRY) as u8) << 7) | (value >> 1);
+                    self.store_reg8(reg, new_value);
+
+                    self.flags = Flags::empty();
+                    if new_carry {
+                        self.flags |= Flags::CARRY;
+                    }
+                    if set_zero && new_value == 0 {
+                        self.flags |= Flags::ZERO;
+                    }
+                }
+                MicroOp::ShiftRightIntoCarry { reg } => {
+                    let value = self.load_reg8(reg);
+                    let carry = (value & 0x1) == 1;
+                    let new_value = value >> 1;
+
+                    self.store_reg8(reg, new_value);
+                    self.flags = Flags::empty();
+                    if carry {
+                        self.flags |= Flags::CARRY;
+                    }
+                    if new_value == 0 {
+                        self.flags |= Flags::ZERO;
+                    }
                 }
                 MicroOp::EnableInterrupts => {
                     info!("Enable interrupts")

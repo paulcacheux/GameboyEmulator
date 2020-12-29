@@ -92,6 +92,13 @@ pub enum MicroOp {
         reg: Register8,
         set_zero: bool,
     },
+    RotateRightThroughCarry {
+        reg: Register8,
+        set_zero: bool,
+    },
+    ShiftRightIntoCarry {
+        reg: Register8,
+    },
     CheckFlags {
         condition: JumpCondition,
         true_ops: Vec<MicroOp>,
