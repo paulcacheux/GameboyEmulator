@@ -349,6 +349,9 @@ impl<M: Memory> CPU<M> {
             0xE5 => Instruction::PushReg16 {
                 reg: Register16::HL,
             },
+            0xE6 => Instruction::AndAWithLiteral {
+                literal: self.fetch_and_advance(),
+            },
             0xEA => Instruction::WriteReg8ValueAtAddress {
                 addr: self.fetch_and_advance_u16(),
                 reg: Register8::A,
@@ -425,6 +428,20 @@ impl<M: Memory> CPU<M> {
                 }
                 MicroOp::LoadReg16Lit { reg, literal } => {
                     self.store_reg16(reg, literal);
+                }
+                MicroOp::AndAReg { reg } => {
+                    self.reg_a &= self.load_reg8(reg);
+                    self.flags = Flags::HALF_CARRY;
+                    if self.reg_a == 0 {
+                        self.flags |= Flags::ZERO;
+                    }
+                }
+                MicroOp::AndALit { literal } => {
+                    self.reg_a &= literal;
+                    self.flags = Flags::HALF_CARRY;
+                    if self.reg_a == 0 {
+                        self.flags |= Flags::ZERO;
+                    }
                 }
                 MicroOp::OrAReg { reg } => {
                     self.reg_a |= self.load_reg8(reg);

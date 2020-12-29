@@ -18,6 +18,12 @@ pub enum Instruction {
         reg: Register16,
         literal: u16,
     },
+    AndAWithReg8 {
+        reg: Register8,
+    },
+    AndAWithLiteral {
+        literal: u8,
+    },
     OrAWithReg8 {
         reg: Register8,
     },
@@ -158,6 +164,12 @@ impl fmt::Display for Instruction {
             Instruction::LoadLiteralIntoReg16 { reg, literal } => {
                 write!(f, "LD {}, ${:04x}", reg, literal)
             }
+            Instruction::AndAWithReg8 { reg } => {
+                write!(f, "AND A, {}", reg)
+            }
+            Instruction::AndAWithLiteral { literal } => {
+                write!(f, "AND A, ${:02x}", literal)
+            }
             Instruction::OrAWithReg8 { reg } => {
                 write!(f, "OR A, {}", reg)
             }
@@ -270,6 +282,10 @@ impl Instruction {
                     simpl::load_literal_into_reg8(literal as u8, reg.lower_half()),
                     simpl::load_literal_into_reg8((literal >> 8) as u8, reg.higher_half()),
                 ]
+            }
+            Instruction::AndAWithReg8 { reg } => vec![MicroOp::AndAReg { reg }],
+            Instruction::AndAWithLiteral { literal } => {
+                vec![MicroOp::NOP, MicroOp::AndALit { literal }]
             }
             Instruction::OrAWithReg8 { reg } => vec![MicroOp::OrAReg { reg }],
             Instruction::XorAWithReg8 { reg } => {

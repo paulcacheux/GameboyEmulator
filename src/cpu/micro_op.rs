@@ -27,6 +27,12 @@ pub enum MicroOp {
         reg: Register16,
         literal: u16,
     },
+    AndAReg {
+        reg: Register8,
+    },
+    AndALit {
+        literal: u8,
+    },
     OrAReg {
         reg: Register8,
     },
