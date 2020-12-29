@@ -1,3 +1,4 @@
 /target
 /test_roms
 *.ppm
+*.output.log
