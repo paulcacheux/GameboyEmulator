@@ -51,6 +51,7 @@ pub enum Instruction {
     ReadMem {
         reg: Register8,
         addr: Register16,
+        post_op: Option<PrePostOperation>,
     },
     ReadMemZeroPageLit {
         lit_offset: u8,
@@ -181,9 +182,17 @@ impl fmt::Display for Instruction {
             Instruction::WriteMemZeroPageLit { lit_offset, reg } => {
                 write!(f, "LD ($FF00 + ${:02x}), {}", lit_offset, reg)
             }
-            Instruction::ReadMem { reg, addr } => {
-                write!(f, "LD {}, ({})", reg, addr)
-            }
+            Instruction::ReadMem { reg, addr, post_op } => match post_op {
+                Some(PrePostOperation::Dec) => {
+                    write!(f, "LD {}, ({}-)", reg, addr)
+                }
+                Some(PrePostOperation::Inc) => {
+                    write!(f, "LD {}, ({}+)", reg, addr)
+                }
+                None => {
+                    write!(f, "LD {}, ({})", reg, addr)
+                }
+            },
             Instruction::ReadMemZeroPageLit { lit_offset, reg } => {
                 write!(f, "LD {}, ($FF00 + ${:02x})", reg, lit_offset)
             }
@@ -311,15 +320,8 @@ impl Instruction {
                     source: Move8BitsSource::Address(0xFF00 + lit_offset as u16),
                 },
             ],
-            Instruction::ReadMem { reg, addr } => {
-                vec![
-                    MicroOp::NOP,
-                    MicroOp::ReadMem {
-                        reg,
-                        addr,
-                        post_op: None,
-                    },
-                ]
+            Instruction::ReadMem { reg, addr, post_op } => {
+                vec![MicroOp::NOP, MicroOp::ReadMem { reg, addr, post_op }]
             }
             Instruction::PushReg16 { reg } => vec![
                 MicroOp::NOP,

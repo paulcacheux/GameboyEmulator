@@ -27,6 +27,9 @@ impl MMU {
     }
 }
 
+const SERIAL_TRANSFER_DATA_ADDR: u16 = 0xFF01;
+const SERIAL_TRANSFER_CONTROL_ADDR: u16 = 0xFF02;
+
 impl Memory for MMU {
     fn read_memory(&self, addr: u16) -> u8 {
         match addr {
@@ -44,6 +47,11 @@ impl Memory for MMU {
     }
 
     fn write_memory(&mut self, addr: u16, value: u8) {
+        // Used for test roms output
+        if addr == SERIAL_TRANSFER_CONTROL_ADDR && value == 0x81 {
+            print!("{}", self.read_memory(SERIAL_TRANSFER_DATA_ADDR) as char);
+        }
+
         match addr {
             0x0000..=0x7FFF => self.rom[addr as usize] = value,
             0x8000..=0x9FFF => self.vram[addr as usize - 0x8000] = value,

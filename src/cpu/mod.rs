@@ -73,6 +73,7 @@ impl<M: Memory> CPU<M> {
             Register8::SPLow => self.sp as u8,
             Register8::PCHigh => (self.pc >> 8) as u8,
             Register8::PCLow => self.pc as u8,
+            Register8::Flags => self.flags.bits(),
         }
     }
 
@@ -97,11 +98,15 @@ impl<M: Memory> CPU<M> {
             Register8::PCLow => {
                 self.pc = (self.pc & 0xFF00) | (value as u16);
             }
+            Register8::Flags => {
+                self.flags = Flags::from_bits(value).expect("Failed to parse flags from bits")
+            }
         }
     }
 
     pub fn load_reg16(&self, reg: Register16) -> u16 {
         match reg {
+            Register16::AF => combine(self.reg_a, self.flags.bits()),
             Register16::BC => combine(self.reg_b, self.reg_c),
             Register16::DE => combine(self.reg_d, self.reg_e),
             Register16::HL => combine(self.reg_h, self.reg_l),
@@ -112,6 +117,11 @@ impl<M: Memory> CPU<M> {
 
     pub fn store_reg16(&mut self, reg: Register16, value: u16) {
         match reg {
+            Register16::AF => {
+                self.reg_a = (value >> 8) as u8;
+                self.flags =
+                    Flags::from_bits(value as u8).expect("Failed to parse flags from bits");
+            }
             Register16::BC => {
                 self.reg_b = (value >> 8) as u8;
                 self.reg_c = value as u8;
@@ -147,6 +157,13 @@ impl<M: Memory> CPU<M> {
 
         match opcode {
             0x00 => Instruction::NOP,
+            0x01 => Instruction::LoadRegLit16bits {
+                reg: Register16::BC,
+                literal: self.fetch_and_advance_u16(),
+            },
+            0x03 => Instruction::IncReg16 {
+                reg: Register16::BC,
+            },
             0x04 => Instruction::IncReg8 { reg: Register8::B },
             0x05 => Instruction::DecReg8 { reg: Register8::B },
             0x06 => Instruction::LoadRegLit8bits {
@@ -163,9 +180,15 @@ impl<M: Memory> CPU<M> {
                 reg: Register16::DE,
                 literal: self.fetch_and_advance_u16(),
             },
+            0x12 => Instruction::WriteMem {
+                addr: Register16::DE,
+                reg: Register8::A,
+                post_op: None,
+            },
             0x13 => Instruction::IncReg16 {
                 reg: Register16::DE,
             },
+            0x14 => Instruction::IncReg8 { reg: Register8::D },
             0x15 => Instruction::DecReg8 { reg: Register8::D },
             0x16 => Instruction::LoadRegLit8bits {
                 reg: Register8::D,
@@ -179,7 +202,9 @@ impl<M: Memory> CPU<M> {
             0x1A => Instruction::ReadMem {
                 addr: Register16::DE,
                 reg: Register8::A,
+                post_op: None,
             },
+            0x1C => Instruction::IncReg8 { reg: Register8::E },
             0x1D => Instruction::DecReg8 { reg: Register8::E },
             0x1E => Instruction::LoadRegLit8bits {
                 reg: Register8::E,
@@ -202,9 +227,15 @@ impl<M: Memory> CPU<M> {
                 reg: Register16::HL,
             },
             0x24 => Instruction::IncReg8 { reg: Register8::H },
+            0x25 => Instruction::DecReg8 { reg: Register8::H },
             0x28 => Instruction::JumpRelative {
                 condition: Some(JumpCondition::Zero),
                 offset: self.fetch_and_advance() as i8,
+            },
+            0x2A => Instruction::ReadMem {
+                reg: Register8::A,
+                addr: Register16::HL,
+                post_op: Some(PrePostOperation::Inc),
             },
             0x2E => Instruction::LoadRegLit8bits {
                 reg: Register8::L,
@@ -227,6 +258,10 @@ impl<M: Memory> CPU<M> {
             0x3E => Instruction::LoadRegLit8bits {
                 reg: Register8::A,
                 literal: self.fetch_and_advance(),
+            },
+            0x47 => Instruction::Move {
+                dest: Register8::B,
+                src: Register8::A,
             },
             0x4F => Instruction::Move {
                 dest: Register8::C,
@@ -303,9 +338,15 @@ impl<M: Memory> CPU<M> {
                 lit_offset: self.fetch_and_advance(),
                 reg: Register8::A,
             },
+            0xE1 => Instruction::PopReg16 {
+                reg: Register16::HL,
+            },
             0xE2 => Instruction::WriteMemZeroPage {
                 reg_offset: Register8::C,
                 reg: Register8::A,
+            },
+            0xE5 => Instruction::PushReg16 {
+                reg: Register16::HL,
             },
             0xEA => Instruction::WriteMemLit {
                 addr: self.fetch_and_advance_u16(),
@@ -315,7 +356,13 @@ impl<M: Memory> CPU<M> {
                 reg: Register8::A,
                 lit_offset: self.fetch_and_advance(),
             },
+            0xF1 => Instruction::PopReg16 {
+                reg: Register16::AF,
+            },
             0xF3 => Instruction::DisableInterrupts,
+            0xF5 => Instruction::PushReg16 {
+                reg: Register16::AF,
+            },
             0xFB => Instruction::EnableInterrupts,
             0xFE => Instruction::CompareLit {
                 literal: self.fetch_and_advance(),

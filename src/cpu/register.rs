@@ -2,6 +2,7 @@ use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Register16 {
+    AF,
     BC,
     DE,
     HL,
@@ -12,6 +13,7 @@ pub enum Register16 {
 impl Register16 {
     pub fn higher_half(self) -> Register8 {
         match self {
+            Register16::AF => Register8::A,
             Register16::BC => Register8::B,
             Register16::DE => Register8::D,
             Register16::HL => Register8::H,
@@ -24,6 +26,7 @@ impl Register16 {
 
     pub fn lower_half(self) -> Register8 {
         match self {
+            Register16::AF => Register8::Flags,
             Register16::BC => Register8::C,
             Register16::DE => Register8::E,
             Register16::HL => Register8::L,
@@ -48,11 +51,15 @@ pub enum Register8 {
     SPLow,
     PCHigh,
     PCLow,
+    Flags,
 }
 
 impl fmt::Display for Register16 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Register16::AF => {
+                write!(f, "AF")
+            }
             Register16::BC => {
                 write!(f, "BC")
             }
@@ -107,6 +114,9 @@ impl fmt::Display for Register8 {
             }
             Register8::PCLow => {
                 write!(f, "PC[low]")
+            }
+            Register8::Flags => {
+                write!(f, "F")
             }
         }
     }
