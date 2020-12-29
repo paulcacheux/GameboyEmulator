@@ -3,12 +3,15 @@ use bitflags::bitflags;
 use std::collections::VecDeque;
 
 mod instruction;
+mod micro_op;
 mod register;
-use instruction::{Instruction, JumpCondition, MicroOp};
+
+use instruction::{Instruction, JumpCondition};
 use log::{debug, info};
+use micro_op::{MicroOp, Move8BitsDestination, Move8BitsSource};
 use register::{Register16, Register8};
 
-use self::instruction::{Move8BitsDestination, Move8BitsSource, PrePostOperation};
+use self::instruction::PrePostOperation;
 
 bitflags! {
     struct Flags: u8 {
