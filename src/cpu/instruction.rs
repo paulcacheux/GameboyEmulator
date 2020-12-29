@@ -27,6 +27,9 @@ pub enum Instruction {
     OrAWithReg8 {
         reg: Register8,
     },
+    OrAWithIndirect {
+        addr: Register16,
+    },
     XorAWithReg8 {
         reg: Register8,
     },
@@ -41,6 +44,9 @@ pub enum Instruction {
     },
     AddAWithIndirect {
         addr: Register16,
+    },
+    AdcAWithLiteral {
+        literal: u8,
     },
     SubAWithReg8 {
         reg: Register8,
@@ -96,7 +102,9 @@ pub enum Instruction {
         condition: Option<JumpCondition>,
         addr: u16,
     },
-    Return,
+    Return {
+        condition: Option<JumpCondition>,
+    },
     JumpRelative {
         condition: Option<JumpCondition>,
         offset: i8,
@@ -112,6 +120,9 @@ pub enum Instruction {
     },
     DecReg8 {
         reg: Register8,
+    },
+    DecIndirect {
+        addr: Register16,
     },
     CompareAWithLiteral {
         literal: u8,
@@ -193,6 +204,9 @@ impl fmt::Display for Instruction {
             Instruction::OrAWithReg8 { reg } => {
                 write!(f, "OR A, {}", reg)
             }
+            Instruction::OrAWithIndirect { addr } => {
+                write!(f, "OR A, ({})", addr)
+            }
             Instruction::XorAWithReg8 { reg } => {
                 write!(f, "XOR A, {}", reg)
             }
@@ -207,6 +221,9 @@ impl fmt::Display for Instruction {
             }
             Instruction::AddAWithLiteral { literal } => {
                 write!(f, "ADD A, ${:02x}", literal)
+            }
+            Instruction::AdcAWithLiteral { literal } => {
+                write!(f, "ADC A, ${:02x}", literal)
             }
             Instruction::SubAWithReg8 { reg } => {
                 write!(f, "SUB A, {}", reg)
@@ -268,7 +285,13 @@ impl fmt::Display for Instruction {
                     write!(f, "CALL ${:04x}", addr)
                 }
             }
-            Instruction::Return => write!(f, "RET"),
+            Instruction::Return { condition } => {
+                if let Some(cond) = condition {
+                    write!(f, "RET {}", cond)
+                } else {
+                    write!(f, "RET")
+                }
+            }
             Instruction::JumpRelative { condition, offset } => {
                 if let Some(cond) = condition {
                     write!(f, "JR {}, {}", cond, offset) // TODO: change the offset format
@@ -287,6 +310,9 @@ impl fmt::Display for Instruction {
             }
             Instruction::DecReg8 { reg } => {
                 write!(f, "DEC {}", reg)
+            }
+            Instruction::DecIndirect { addr } => {
+                write!(f, "DEC ({})", addr)
             }
             Instruction::CompareAWithLiteral { literal } => {
                 write!(f, "CP ${:02x}", literal)
@@ -340,6 +366,12 @@ impl Instruction {
                 ]
             }
             Instruction::OrAWithReg8 { reg } => vec![MicroOp::OrA { rhs: reg.into() }],
+            Instruction::OrAWithIndirect { addr } => vec![
+                MicroOp::NOP,
+                MicroOp::OrA {
+                    rhs: Source8bits::Indirect(addr),
+                },
+            ],
             Instruction::XorAWithReg8 { reg } => {
                 vec![MicroOp::XorA { rhs: reg.into() }]
             }
@@ -371,6 +403,14 @@ impl Instruction {
                 vec![
                     MicroOp::NOP,
                     MicroOp::AddA {
+                        rhs: literal.into(),
+                    },
+                ]
+            }
+            Instruction::AdcAWithLiteral { literal } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::AdcA {
                         rhs: literal.into(),
                     },
                 ]
@@ -537,20 +577,45 @@ impl Instruction {
                 }
             }
 
-            Instruction::Return => vec![
-                MicroOp::NOP,
-                MicroOp::NOP,
-                MicroOp::ReadMem {
-                    reg: Register8::PCLow,
-                    addr: Register16::SP,
-                    post_op: Some(PrePostOperation::Inc),
-                },
-                MicroOp::ReadMem {
-                    reg: Register8::PCHigh,
-                    addr: Register16::SP,
-                    post_op: Some(PrePostOperation::Inc),
-                },
-            ],
+            Instruction::Return { condition } => {
+                if let Some(cond) = condition {
+                    vec![
+                        MicroOp::NOP,
+                        MicroOp::CheckFlags {
+                            condition: cond,
+                            true_ops: vec![
+                                MicroOp::NOP,
+                                MicroOp::ReadMem {
+                                    reg: Register8::PCLow,
+                                    addr: Register16::SP,
+                                    post_op: Some(PrePostOperation::Inc),
+                                },
+                                MicroOp::ReadMem {
+                                    reg: Register8::PCHigh,
+                                    addr: Register16::SP,
+                                    post_op: Some(PrePostOperation::Inc),
+                                },
+                            ],
+                            false_ops: vec![],
+                        },
+                    ]
+                } else {
+                    vec![
+                        MicroOp::NOP,
+                        MicroOp::NOP,
+                        MicroOp::ReadMem {
+                            reg: Register8::PCLow,
+                            addr: Register16::SP,
+                            post_op: Some(PrePostOperation::Inc),
+                        },
+                        MicroOp::ReadMem {
+                            reg: Register8::PCHigh,
+                            addr: Register16::SP,
+                            post_op: Some(PrePostOperation::Inc),
+                        },
+                    ]
+                }
+            }
             Instruction::JumpRelative { condition, offset } => {
                 if let Some(cond) = condition {
                     vec![
@@ -574,6 +639,9 @@ impl Instruction {
             Instruction::IncReg16 { reg } => vec![MicroOp::NOP, MicroOp::IncReg16 { reg }],
             Instruction::IncReg8 { reg } => vec![MicroOp::IncReg { reg }],
             Instruction::DecReg8 { reg } => vec![MicroOp::DecReg { reg }],
+            Instruction::DecIndirect { addr } => {
+                vec![MicroOp::NOP, MicroOp::NOP, MicroOp::DecIndirect { addr }]
+            }
             Instruction::CompareAWithLiteral { literal } => {
                 vec![MicroOp::NOP, MicroOp::CompareALit { literal }]
             }

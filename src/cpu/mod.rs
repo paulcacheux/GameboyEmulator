@@ -261,6 +261,9 @@ impl<M: Memory> CPU<M> {
                 reg: Register8::A,
                 post_op: Some(PrePostOperation::Dec),
             },
+            0x35 => Instruction::DecIndirect {
+                addr: Register16::HL,
+            },
             0x36 => Instruction::WriteLiteralAtIndirect {
                 addr: Register16::HL,
                 literal: self.fetch_and_advance(),
@@ -303,6 +306,15 @@ impl<M: Memory> CPU<M> {
             },
             0x67 => Instruction::Move {
                 dest: Register8::H,
+                src: Register8::A,
+            },
+            0x6E => Instruction::ReadIndirectToReg8 {
+                addr: Register16::HL,
+                reg: Register8::L,
+                post_op: None,
+            },
+            0x6F => Instruction::Move {
+                dest: Register8::L,
                 src: Register8::A,
             },
             0x70 => Instruction::WriteReg8ValueAtIndirect {
@@ -367,6 +379,9 @@ impl<M: Memory> CPU<M> {
             0xBE => Instruction::CompareAWithIndirect {
                 addr: Register16::HL,
             },
+            0xB6 => Instruction::OrAWithIndirect {
+                addr: Register16::HL,
+            },
             0xB7 => Instruction::OrAWithReg8 { reg: Register8::A },
             0xC1 => Instruction::PopReg16 {
                 reg: Register16::BC,
@@ -384,7 +399,10 @@ impl<M: Memory> CPU<M> {
             0xC6 => Instruction::AddAWithLiteral {
                 literal: self.fetch_and_advance(),
             },
-            0xC9 => Instruction::Return,
+            0xC8 => Instruction::Return {
+                condition: Some(JumpCondition::Zero),
+            },
+            0xC9 => Instruction::Return { condition: None },
             0xCB => {
                 // prefix 0xCB:
                 match self.fetch_and_advance() {
@@ -402,6 +420,12 @@ impl<M: Memory> CPU<M> {
             0xCD => Instruction::CallAddr {
                 condition: None,
                 addr: self.fetch_and_advance_u16(),
+            },
+            0xCE => Instruction::AdcAWithLiteral {
+                literal: self.fetch_and_advance(),
+            },
+            0xD0 => Instruction::Return {
+                condition: Some(JumpCondition::NonCarry),
             },
             0xD1 => Instruction::PopReg16 {
                 reg: Register16::DE,
@@ -544,6 +568,25 @@ impl<M: Memory> CPU<M> {
                     self.reg_a = res;
                     self.update_flags_arith(res, false, carry, half_carry);
                 }
+                MicroOp::AdcA { rhs } => {
+                    let a_value = self.reg_a;
+                    let rhs_value = self.source_8bits_to_value(rhs);
+
+                    let (mut res, mut carry) = a_value.overflowing_add(rhs_value);
+                    let mut half_carry = check_half_carry(a_value, rhs_value);
+
+                    if self.flags.contains(Flags::CARRY) {
+                        let (res_carry, carry2) = res.overflowing_add(1);
+                        let half_carry2 = check_half_carry(res, 1);
+
+                        res = res_carry;
+                        carry |= carry2;
+                        half_carry |= half_carry2;
+                    }
+
+                    self.reg_a = res;
+                    self.update_flags_arith(res, false, carry, half_carry);
+                }
                 MicroOp::SubA { rhs } => {
                     let a_value = self.reg_a;
                     let rhs_value = self.source_8bits_to_value(rhs);
@@ -628,15 +671,27 @@ impl<M: Memory> CPU<M> {
                     let half_carry = check_half_carry_sub(reg_value, 1);
                     let new_value = reg_value.wrapping_sub(1);
                     self.store_reg8(reg, new_value);
-                    let mut flags = Flags::NEGATIVE;
-                    if new_value == 0 {
-                        flags |= Flags::ZERO;
-                    }
-                    if half_carry {
-                        flags |= Flags::HALF_CARRY;
-                    }
-                    flags |= self.flags & Flags::CARRY;
-                    self.flags = flags;
+
+                    self.update_flags_arith(
+                        new_value,
+                        true,
+                        self.flags.contains(Flags::CARRY),
+                        half_carry,
+                    );
+                }
+                MicroOp::DecIndirect { addr } => {
+                    let addr = self.load_reg16(addr);
+                    let start_value = self.memory.read_memory(addr);
+                    let half_carry = check_half_carry_sub(start_value, 1);
+                    let new_value = start_value.wrapping_sub(1);
+                    self.memory.write_memory(addr, new_value);
+
+                    self.update_flags_arith(
+                        new_value,
+                        true,
+                        self.flags.contains(Flags::CARRY),
+                        half_carry,
+                    );
                 }
                 MicroOp::CompareALit { literal } => {
                     self.compare_a(literal);

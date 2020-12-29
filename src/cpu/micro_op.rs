@@ -51,6 +51,9 @@ pub enum MicroOp {
     AddA {
         rhs: Source8bits,
     },
+    AdcA {
+        rhs: Source8bits,
+    },
     SubA {
         rhs: Source8bits,
     },
@@ -81,6 +84,9 @@ pub enum MicroOp {
     },
     DecReg {
         reg: Register8,
+    },
+    DecIndirect {
+        addr: Register16,
     },
     CompareALit {
         literal: u8,
