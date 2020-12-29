@@ -7,6 +7,7 @@ pub enum Move8BitsDestination {
     Address(u16),
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Move8BitsSource {
     Register(Register8),

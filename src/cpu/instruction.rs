@@ -100,6 +100,7 @@ pub enum Instruction {
     DisableInterrupts,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JumpCondition {
     NonZero,
