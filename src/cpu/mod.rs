@@ -5,7 +5,7 @@ use std::collections::VecDeque;
 mod instruction;
 mod register;
 use instruction::{Instruction, JumpCondition, MicroOp};
-use log::debug;
+use log::{debug, info};
 use register::{Register16, Register8};
 
 use self::instruction::PrePostOperation;
@@ -216,6 +216,10 @@ impl<M: Memory> CPU<M> {
                 reg: Register8::A,
                 post_op: Some(PrePostOperation::Dec),
             },
+            0x36 => Instruction::WriteLitAt {
+                addr: Register16::HL,
+                literal: self.fetch_and_advance(),
+            },
             0x3D => Instruction::DecReg8 { reg: Register8::A },
             0x3E => Instruction::LoadRegLit8bits {
                 reg: Register8::A,
@@ -271,6 +275,9 @@ impl<M: Memory> CPU<M> {
             0xC1 => Instruction::PopReg16 {
                 reg: Register16::BC,
             },
+            0xC3 => Instruction::JumpAbsolute {
+                addr: self.fetch_and_advance_u16(),
+            },
             0xC5 => Instruction::PushReg16 {
                 reg: Register16::BC,
             },
@@ -305,6 +312,8 @@ impl<M: Memory> CPU<M> {
                 reg: Register8::A,
                 lit_offset: self.fetch_and_advance(),
             },
+            0xF3 => Instruction::DisableInterrupts,
+            0xFB => Instruction::EnableInterrupts,
             0xFE => Instruction::CompareLit {
                 literal: self.fetch_and_advance(),
             },
@@ -326,12 +335,8 @@ impl<M: Memory> CPU<M> {
 
     pub fn step(&mut self) {
         if self.pipeline.is_empty() {
-            let pc = self.pc;
-            if pc > 0x100 {
-                return;
-            }
             let instruction = self.fetch_and_decode();
-            debug!("{:#06x}: {}", pc, instruction);
+            debug!("{:#06x}: {}", self.pc, instruction);
             self.pipeline.extend(instruction.to_micro_ops());
         }
 
@@ -377,6 +382,9 @@ impl<M: Memory> CPU<M> {
                 }
                 MicroOp::WriteMemLit { addr, reg } => {
                     self.memory.write_memory(addr, self.load_reg8(reg));
+                }
+                MicroOp::WriteLitAt { addr, literal } => {
+                    self.memory.write_memory(self.load_reg16(addr), literal);
                 }
                 MicroOp::WriteMem {
                     addr,
@@ -481,6 +489,12 @@ impl<M: Memory> CPU<M> {
                         flags |= Flags::ZERO;
                     }
                     self.flags = flags;
+                }
+                MicroOp::EnableInterrupts => {
+                    info!("Enable interrupts")
+                }
+                MicroOp::DisableInterrupts => {
+                    info!("Disable interrupts")
                 }
             }
         }

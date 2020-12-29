@@ -30,6 +30,10 @@ pub enum Instruction {
         addr: u16,
         reg: Register8,
     },
+    WriteLitAt {
+        addr: Register16,
+        literal: u8,
+    },
     WriteMem {
         addr: Register16,
         reg: Register8,
@@ -69,6 +73,9 @@ pub enum Instruction {
         condition: Option<JumpCondition>,
         offset: i8,
     },
+    JumpAbsolute {
+        addr: u16,
+    },
     IncReg16 {
         reg: Register16,
     },
@@ -88,6 +95,8 @@ pub enum Instruction {
     RotateLeftThroughCarry {
         reg: Register8,
     },
+    EnableInterrupts,
+    DisableInterrupts,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -150,6 +159,9 @@ impl fmt::Display for Instruction {
             Instruction::WriteMemLit { addr, reg } => {
                 write!(f, "LD (${:04x}), {}", addr, reg)
             }
+            Instruction::WriteLitAt { addr, literal } => {
+                write!(f, "LD ({}), ${:04x}", addr, literal)
+            }
             Instruction::WriteMem { addr, reg, post_op } => match post_op {
                 Some(PrePostOperation::Dec) => {
                     write!(f, "LD ({}-), {}", addr, reg)
@@ -189,6 +201,9 @@ impl fmt::Display for Instruction {
                     write!(f, "JR {}", offset) // TODO: change the offset format
                 }
             }
+            Instruction::JumpAbsolute { addr } => {
+                write!(f, "JP {:06x}", addr)
+            }
             Instruction::IncReg16 { reg } => {
                 write!(f, "INC {}", reg)
             }
@@ -210,6 +225,8 @@ impl fmt::Display for Instruction {
             Instruction::RotateLeftThroughCarry { reg } => {
                 write!(f, "RL {}", reg)
             }
+            Instruction::EnableInterrupts => write!(f, "EI"),
+            Instruction::DisableInterrupts => write!(f, "DI"),
         }
     }
 }
@@ -250,6 +267,13 @@ impl Instruction {
                     MicroOp::NOP,
                     MicroOp::NOP,
                     MicroOp::WriteMemLit { addr, reg },
+                ]
+            }
+            Instruction::WriteLitAt { addr, literal } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::WriteLitAt { addr, literal },
                 ]
             }
             Instruction::WriteMem { addr, reg, post_op } => {
@@ -370,6 +394,18 @@ impl Instruction {
                 },
                 MicroOp::RelativeJump(offset),
             ],
+            Instruction::JumpAbsolute { addr } => vec![
+                MicroOp::NOP,
+                MicroOp::NOP,
+                MicroOp::LoadRegLit {
+                    reg: Register8::PCLow,
+                    literal: addr as u8,
+                },
+                MicroOp::LoadRegLit {
+                    reg: Register8::PCHigh,
+                    literal: (addr >> 8) as u8,
+                },
+            ],
             Instruction::IncReg16 { reg } => vec![MicroOp::NOP, MicroOp::IncReg16 { reg }],
             Instruction::IncReg8 { reg } => vec![MicroOp::IncReg { reg }],
             Instruction::DecReg8 { reg } => vec![MicroOp::DecReg { reg }],
@@ -392,6 +428,8 @@ impl Instruction {
                     },
                 ]
             }
+            Instruction::EnableInterrupts => vec![MicroOp::EnableInterrupts],
+            Instruction::DisableInterrupts => vec![MicroOp::DisableInterrupts],
         }
     }
 }
@@ -429,6 +467,10 @@ pub enum MicroOp {
         reg: Register8,
         pre_op: Option<PrePostOperation>,
         post_op: Option<PrePostOperation>,
+    },
+    WriteLitAt {
+        addr: Register16,
+        literal: u8,
     },
     WriteMemZeroPage {
         reg_offset: Register8,
@@ -468,4 +510,6 @@ pub enum MicroOp {
     },
     CheckFlags(JumpCondition),
     RelativeJump(i8),
+    EnableInterrupts,
+    DisableInterrupts,
 }
