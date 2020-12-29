@@ -157,7 +157,7 @@ impl<M: Memory> CPU<M> {
 
         match opcode {
             0x00 => Instruction::NOP,
-            0x01 => Instruction::LoadRegLit16bits {
+            0x01 => Instruction::LoadLiteralIntoReg16 {
                 reg: Register16::BC,
                 literal: self.fetch_and_advance_u16(),
             },
@@ -166,21 +166,21 @@ impl<M: Memory> CPU<M> {
             },
             0x04 => Instruction::IncReg8 { reg: Register8::B },
             0x05 => Instruction::DecReg8 { reg: Register8::B },
-            0x06 => Instruction::LoadRegLit8bits {
+            0x06 => Instruction::LoadLiteralIntoReg8 {
                 reg: Register8::B,
                 literal: self.fetch_and_advance(),
             },
             0x0C => Instruction::IncReg8 { reg: Register8::C },
             0x0D => Instruction::DecReg8 { reg: Register8::C },
-            0x0E => Instruction::LoadRegLit8bits {
+            0x0E => Instruction::LoadLiteralIntoReg8 {
                 reg: Register8::C,
                 literal: self.fetch_and_advance(),
             },
-            0x11 => Instruction::LoadRegLit16bits {
+            0x11 => Instruction::LoadLiteralIntoReg16 {
                 reg: Register16::DE,
                 literal: self.fetch_and_advance_u16(),
             },
-            0x12 => Instruction::WriteMem {
+            0x12 => Instruction::WriteReg8ValueAtIndirect {
                 addr: Register16::DE,
                 reg: Register8::A,
                 post_op: None,
@@ -190,7 +190,7 @@ impl<M: Memory> CPU<M> {
             },
             0x14 => Instruction::IncReg8 { reg: Register8::D },
             0x15 => Instruction::DecReg8 { reg: Register8::D },
-            0x16 => Instruction::LoadRegLit8bits {
+            0x16 => Instruction::LoadLiteralIntoReg8 {
                 reg: Register8::D,
                 literal: self.fetch_and_advance(),
             },
@@ -199,14 +199,14 @@ impl<M: Memory> CPU<M> {
                 condition: None,
                 offset: self.fetch_and_advance() as i8,
             },
-            0x1A => Instruction::ReadMem {
+            0x1A => Instruction::ReadIndirectToReg8 {
                 addr: Register16::DE,
                 reg: Register8::A,
                 post_op: None,
             },
             0x1C => Instruction::IncReg8 { reg: Register8::E },
             0x1D => Instruction::DecReg8 { reg: Register8::E },
-            0x1E => Instruction::LoadRegLit8bits {
+            0x1E => Instruction::LoadLiteralIntoReg8 {
                 reg: Register8::E,
                 literal: self.fetch_and_advance(),
             },
@@ -214,11 +214,11 @@ impl<M: Memory> CPU<M> {
                 condition: Some(JumpCondition::NonZero),
                 offset: self.fetch_and_advance() as i8,
             },
-            0x21 => Instruction::LoadRegLit16bits {
+            0x21 => Instruction::LoadLiteralIntoReg16 {
                 reg: Register16::HL,
                 literal: self.fetch_and_advance_u16(),
             },
-            0x22 => Instruction::WriteMem {
+            0x22 => Instruction::WriteReg8ValueAtIndirect {
                 addr: Register16::HL,
                 reg: Register8::A,
                 post_op: Some(PrePostOperation::Inc),
@@ -232,30 +232,30 @@ impl<M: Memory> CPU<M> {
                 condition: Some(JumpCondition::Zero),
                 offset: self.fetch_and_advance() as i8,
             },
-            0x2A => Instruction::ReadMem {
+            0x2A => Instruction::ReadIndirectToReg8 {
                 reg: Register8::A,
                 addr: Register16::HL,
                 post_op: Some(PrePostOperation::Inc),
             },
-            0x2E => Instruction::LoadRegLit8bits {
+            0x2E => Instruction::LoadLiteralIntoReg8 {
                 reg: Register8::L,
                 literal: self.fetch_and_advance(),
             },
-            0x31 => Instruction::LoadRegLit16bits {
+            0x31 => Instruction::LoadLiteralIntoReg16 {
                 reg: Register16::SP,
                 literal: self.fetch_and_advance_u16(),
             },
-            0x32 => Instruction::WriteMem {
+            0x32 => Instruction::WriteReg8ValueAtIndirect {
                 addr: Register16::HL,
                 reg: Register8::A,
                 post_op: Some(PrePostOperation::Dec),
             },
-            0x36 => Instruction::WriteLitAt {
+            0x36 => Instruction::WriteLiteralAtIndirect {
                 addr: Register16::HL,
                 literal: self.fetch_and_advance(),
             },
             0x3D => Instruction::DecReg8 { reg: Register8::A },
-            0x3E => Instruction::LoadRegLit8bits {
+            0x3E => Instruction::LoadLiteralIntoReg8 {
                 reg: Register8::A,
                 literal: self.fetch_and_advance(),
             },
@@ -275,7 +275,7 @@ impl<M: Memory> CPU<M> {
                 dest: Register8::H,
                 src: Register8::A,
             },
-            0x77 => Instruction::WriteMem {
+            0x77 => Instruction::WriteReg8ValueAtIndirect {
                 addr: Register16::HL,
                 reg: Register8::A,
                 post_op: None,
@@ -296,19 +296,19 @@ impl<M: Memory> CPU<M> {
                 dest: Register8::A,
                 src: Register8::L,
             },
-            0x86 => Instruction::AddAIndirect {
+            0x86 => Instruction::AddAWithIndirect {
                 addr: Register16::HL,
             },
-            0x90 => Instruction::SubAReg8 { reg: Register8::B },
-            0xA8 => Instruction::XorAReg8 { reg: Register8::B },
-            0xA9 => Instruction::XorAReg8 { reg: Register8::C },
-            0xAA => Instruction::XorAReg8 { reg: Register8::D },
-            0xAB => Instruction::XorAReg8 { reg: Register8::E },
-            0xAC => Instruction::XorAReg8 { reg: Register8::H },
-            0xAD => Instruction::XorAReg8 { reg: Register8::L },
-            0xAF => Instruction::XorAReg8 { reg: Register8::A },
-            0xB1 => Instruction::OrAReg8 { reg: Register8::C },
-            0xBE => Instruction::CompareIndirectAddr {
+            0x90 => Instruction::SubAWithReg8 { reg: Register8::B },
+            0xA8 => Instruction::XorAWithReg8 { reg: Register8::B },
+            0xA9 => Instruction::XorAWithReg8 { reg: Register8::C },
+            0xAA => Instruction::XorAWithReg8 { reg: Register8::D },
+            0xAB => Instruction::XorAWithReg8 { reg: Register8::E },
+            0xAC => Instruction::XorAWithReg8 { reg: Register8::H },
+            0xAD => Instruction::XorAWithReg8 { reg: Register8::L },
+            0xAF => Instruction::XorAWithReg8 { reg: Register8::A },
+            0xB1 => Instruction::OrAWithReg8 { reg: Register8::C },
+            0xBE => Instruction::CompareAWithIndirect {
                 addr: Register16::HL,
             },
             0xC1 => Instruction::PopReg16 {
@@ -335,25 +335,25 @@ impl<M: Memory> CPU<M> {
             0xCD => Instruction::CallAddr {
                 addr: self.fetch_and_advance_u16(),
             },
-            0xE0 => Instruction::WriteMemZeroPageLit {
+            0xE0 => Instruction::WriteReg8ValueAtZeroPageOffsetLiteral {
                 lit_offset: self.fetch_and_advance(),
                 reg: Register8::A,
             },
             0xE1 => Instruction::PopReg16 {
                 reg: Register16::HL,
             },
-            0xE2 => Instruction::WriteMemZeroPage {
+            0xE2 => Instruction::WriteReg8ValueAtZeroPageOffsetReg8 {
                 reg_offset: Register8::C,
                 reg: Register8::A,
             },
             0xE5 => Instruction::PushReg16 {
                 reg: Register16::HL,
             },
-            0xEA => Instruction::WriteMemLit {
+            0xEA => Instruction::WriteReg8ValueAtAddress {
                 addr: self.fetch_and_advance_u16(),
                 reg: Register8::A,
             },
-            0xF0 => Instruction::ReadMemZeroPageLit {
+            0xF0 => Instruction::ReadZeroPageOffsetLiteralToReg8 {
                 reg: Register8::A,
                 lit_offset: self.fetch_and_advance(),
             },
@@ -364,12 +364,12 @@ impl<M: Memory> CPU<M> {
             0xF5 => Instruction::PushReg16 {
                 reg: Register16::AF,
             },
-            0xFA => Instruction::ReadMemLit {
+            0xFA => Instruction::ReadAtAddressToReg8 {
                 addr: self.fetch_and_advance_u16(),
                 reg: Register8::A,
             },
             0xFB => Instruction::EnableInterrupts,
-            0xFE => Instruction::CompareLit {
+            0xFE => Instruction::CompareAWithLiteral {
                 literal: self.fetch_and_advance(),
             },
             _ => panic!("Unknown opcode {:#x} at {:#x}", opcode, pc),

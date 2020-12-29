@@ -10,57 +10,57 @@ pub enum Instruction {
         dest: Register8,
         src: Register8,
     },
-    LoadRegLit8bits {
+    LoadLiteralIntoReg8 {
         reg: Register8,
         literal: u8,
     },
-    LoadRegLit16bits {
+    LoadLiteralIntoReg16 {
         reg: Register16,
         literal: u16,
     },
-    OrAReg8 {
+    OrAWithReg8 {
         reg: Register8,
     },
-    XorAReg8 {
+    XorAWithReg8 {
         reg: Register8,
     },
-    AddAIndirect {
+    AddAWithIndirect {
         addr: Register16,
     },
-    SubAReg8 {
+    SubAWithReg8 {
         reg: Register8,
     },
-    WriteMemLit {
+    WriteReg8ValueAtAddress {
         addr: u16,
         reg: Register8,
     },
-    WriteLitAt {
+    WriteLiteralAtIndirect {
         addr: Register16,
         literal: u8,
     },
-    WriteMem {
+    WriteReg8ValueAtIndirect {
         addr: Register16,
         reg: Register8,
         post_op: Option<PrePostOperation>,
     },
-    WriteMemZeroPage {
+    WriteReg8ValueAtZeroPageOffsetReg8 {
         reg_offset: Register8,
         reg: Register8,
     },
-    WriteMemZeroPageLit {
+    WriteReg8ValueAtZeroPageOffsetLiteral {
         lit_offset: u8,
         reg: Register8,
     },
-    ReadMem {
+    ReadIndirectToReg8 {
         reg: Register8,
         addr: Register16,
         post_op: Option<PrePostOperation>,
     },
-    ReadMemLit {
+    ReadAtAddressToReg8 {
         reg: Register8,
         addr: u16,
     },
-    ReadMemZeroPageLit {
+    ReadZeroPageOffsetLiteralToReg8 {
         lit_offset: u8,
         reg: Register8,
     },
@@ -94,14 +94,15 @@ pub enum Instruction {
     DecReg8 {
         reg: Register8,
     },
-    CompareLit {
+    CompareAWithLiteral {
         literal: u8,
     },
-    CompareIndirectAddr {
+    CompareAWithIndirect {
         addr: Register16,
     },
     RotateLeftThroughCarryA,
     RotateLeftThroughCarry {
+        // different instruction because of flags
         reg: Register8,
     },
     EnableInterrupts,
@@ -151,31 +152,31 @@ impl fmt::Display for Instruction {
             Instruction::Move { dest, src } => {
                 write!(f, "LD {}, {}", dest, src)
             }
-            Instruction::LoadRegLit8bits { reg, literal } => {
+            Instruction::LoadLiteralIntoReg8 { reg, literal } => {
                 write!(f, "LD {}, ${:02x}", reg, literal)
             }
-            Instruction::LoadRegLit16bits { reg, literal } => {
+            Instruction::LoadLiteralIntoReg16 { reg, literal } => {
                 write!(f, "LD {}, ${:04x}", reg, literal)
             }
-            Instruction::OrAReg8 { reg } => {
+            Instruction::OrAWithReg8 { reg } => {
                 write!(f, "OR A, {}", reg)
             }
-            Instruction::XorAReg8 { reg } => {
+            Instruction::XorAWithReg8 { reg } => {
                 write!(f, "XOR A, {}", reg)
             }
-            Instruction::AddAIndirect { addr } => {
+            Instruction::AddAWithIndirect { addr } => {
                 write!(f, "ADD A, ({})", addr)
             }
-            Instruction::SubAReg8 { reg } => {
+            Instruction::SubAWithReg8 { reg } => {
                 write!(f, "SUB A, {}", reg)
             }
-            Instruction::WriteMemLit { addr, reg } => {
+            Instruction::WriteReg8ValueAtAddress { addr, reg } => {
                 write!(f, "LD (${:04x}), {}", addr, reg)
             }
-            Instruction::WriteLitAt { addr, literal } => {
+            Instruction::WriteLiteralAtIndirect { addr, literal } => {
                 write!(f, "LD ({}), ${:04x}", addr, literal)
             }
-            Instruction::WriteMem { addr, reg, post_op } => match post_op {
+            Instruction::WriteReg8ValueAtIndirect { addr, reg, post_op } => match post_op {
                 Some(PrePostOperation::Dec) => {
                     write!(f, "LD ({}-), {}", addr, reg)
                 }
@@ -186,13 +187,13 @@ impl fmt::Display for Instruction {
                     write!(f, "LD ({}), {}", addr, reg)
                 }
             },
-            Instruction::WriteMemZeroPage { reg_offset, reg } => {
+            Instruction::WriteReg8ValueAtZeroPageOffsetReg8 { reg_offset, reg } => {
                 write!(f, "LD ($FF00 + {}), {}", reg_offset, reg)
             }
-            Instruction::WriteMemZeroPageLit { lit_offset, reg } => {
+            Instruction::WriteReg8ValueAtZeroPageOffsetLiteral { lit_offset, reg } => {
                 write!(f, "LD ($FF00 + ${:02x}), {}", lit_offset, reg)
             }
-            Instruction::ReadMem { reg, addr, post_op } => match post_op {
+            Instruction::ReadIndirectToReg8 { reg, addr, post_op } => match post_op {
                 Some(PrePostOperation::Dec) => {
                     write!(f, "LD {}, ({}-)", reg, addr)
                 }
@@ -203,10 +204,10 @@ impl fmt::Display for Instruction {
                     write!(f, "LD {}, ({})", reg, addr)
                 }
             },
-            Instruction::ReadMemLit { reg, addr } => {
+            Instruction::ReadAtAddressToReg8 { reg, addr } => {
                 write!(f, "LD {}, (${:04x})", reg, addr)
             }
-            Instruction::ReadMemZeroPageLit { lit_offset, reg } => {
+            Instruction::ReadZeroPageOffsetLiteralToReg8 { lit_offset, reg } => {
                 write!(f, "LD {}, ($FF00 + ${:02x})", reg, lit_offset)
             }
             Instruction::PushReg16 { reg } => {
@@ -237,10 +238,10 @@ impl fmt::Display for Instruction {
             Instruction::DecReg8 { reg } => {
                 write!(f, "DEC {}", reg)
             }
-            Instruction::CompareLit { literal } => {
+            Instruction::CompareAWithLiteral { literal } => {
                 write!(f, "CP ${:02x}", literal)
             }
-            Instruction::CompareIndirectAddr { addr } => {
+            Instruction::CompareAWithIndirect { addr } => {
                 write!(f, "CP ({})", addr)
             }
             Instruction::RotateLeftThroughCarryA => {
@@ -260,27 +261,27 @@ impl Instruction {
         match self {
             Instruction::NOP => vec![MicroOp::NOP],
             Instruction::Move { dest, src } => vec![simpl::move_micro_op(dest, src)],
-            Instruction::LoadRegLit8bits { reg, literal } => {
+            Instruction::LoadLiteralIntoReg8 { reg, literal } => {
                 vec![MicroOp::NOP, simpl::load_literal_into_reg8(literal, reg)]
             }
-            Instruction::LoadRegLit16bits { reg, literal } => {
+            Instruction::LoadLiteralIntoReg16 { reg, literal } => {
                 vec![
                     MicroOp::NOP,
                     simpl::load_literal_into_reg8(literal as u8, reg.lower_half()),
                     simpl::load_literal_into_reg8((literal >> 8) as u8, reg.higher_half()),
                 ]
             }
-            Instruction::OrAReg8 { reg } => vec![MicroOp::OrAReg { reg }],
-            Instruction::XorAReg8 { reg } => {
+            Instruction::OrAWithReg8 { reg } => vec![MicroOp::OrAReg { reg }],
+            Instruction::XorAWithReg8 { reg } => {
                 vec![MicroOp::XorAReg { reg }]
             }
-            Instruction::AddAIndirect { addr } => {
+            Instruction::AddAWithIndirect { addr } => {
                 vec![MicroOp::NOP, MicroOp::AddAIndirect { addr }]
             }
-            Instruction::SubAReg8 { reg } => {
+            Instruction::SubAWithReg8 { reg } => {
                 vec![MicroOp::SubAReg { reg }]
             }
-            Instruction::WriteMemLit { addr, reg } => {
+            Instruction::WriteReg8ValueAtAddress { addr, reg } => {
                 vec![
                     MicroOp::NOP,
                     MicroOp::NOP,
@@ -291,7 +292,7 @@ impl Instruction {
                     },
                 ]
             }
-            Instruction::WriteLitAt { addr, literal } => {
+            Instruction::WriteLiteralAtIndirect { addr, literal } => {
                 vec![
                     MicroOp::NOP,
                     MicroOp::NOP,
@@ -301,7 +302,7 @@ impl Instruction {
                     },
                 ]
             }
-            Instruction::WriteMem { addr, reg, post_op } => {
+            Instruction::WriteReg8ValueAtIndirect { addr, reg, post_op } => {
                 vec![
                     MicroOp::NOP,
                     MicroOp::WriteMem {
@@ -312,11 +313,11 @@ impl Instruction {
                     },
                 ]
             }
-            Instruction::WriteMemZeroPage { reg_offset, reg } => {
+            Instruction::WriteReg8ValueAtZeroPageOffsetReg8 { reg_offset, reg } => {
                 vec![MicroOp::NOP, MicroOp::WriteMemZeroPage { reg_offset, reg }]
             }
 
-            Instruction::WriteMemZeroPageLit { lit_offset, reg } => {
+            Instruction::WriteReg8ValueAtZeroPageOffsetLiteral { lit_offset, reg } => {
                 vec![
                     MicroOp::NOP,
                     MicroOp::NOP,
@@ -326,7 +327,7 @@ impl Instruction {
                     },
                 ]
             }
-            Instruction::ReadMemZeroPageLit { lit_offset, reg } => vec![
+            Instruction::ReadZeroPageOffsetLiteralToReg8 { lit_offset, reg } => vec![
                 MicroOp::NOP,
                 MicroOp::NOP,
                 MicroOp::Move8Bits {
@@ -334,7 +335,7 @@ impl Instruction {
                     source: Move8BitsSource::Address(0xFF00 + lit_offset as u16),
                 },
             ],
-            Instruction::ReadMemLit { reg, addr } => vec![
+            Instruction::ReadAtAddressToReg8 { reg, addr } => vec![
                 MicroOp::NOP,
                 MicroOp::Move8Bits {
                     destination: Move8BitsDestination::Register(reg),
@@ -342,7 +343,7 @@ impl Instruction {
                 },
             ],
 
-            Instruction::ReadMem { reg, addr, post_op } => {
+            Instruction::ReadIndirectToReg8 { reg, addr, post_op } => {
                 vec![MicroOp::NOP, MicroOp::ReadMem { reg, addr, post_op }]
             }
             Instruction::PushReg16 { reg } => vec![
@@ -429,10 +430,10 @@ impl Instruction {
             Instruction::IncReg16 { reg } => vec![MicroOp::NOP, MicroOp::IncReg16 { reg }],
             Instruction::IncReg8 { reg } => vec![MicroOp::IncReg { reg }],
             Instruction::DecReg8 { reg } => vec![MicroOp::DecReg { reg }],
-            Instruction::CompareLit { literal } => {
+            Instruction::CompareAWithLiteral { literal } => {
                 vec![MicroOp::NOP, MicroOp::CompareALit { literal }]
             }
-            Instruction::CompareIndirectAddr { addr } => {
+            Instruction::CompareAWithIndirect { addr } => {
                 vec![MicroOp::NOP, MicroOp::CompareAIndirect { addr }]
             }
             Instruction::RotateLeftThroughCarryA => vec![MicroOp::RotateLeftThroughCarry {
