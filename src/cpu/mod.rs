@@ -8,7 +8,7 @@ use instruction::{Instruction, JumpCondition, MicroOp};
 use log::{debug, info};
 use register::{Register16, Register8};
 
-use self::instruction::PrePostOperation;
+use self::instruction::{Move8BitsDestination, Move8BitsSource, PrePostOperation};
 
 bitflags! {
     struct Flags: u8 {
@@ -343,11 +343,30 @@ impl<M: Memory> CPU<M> {
         if let Some(micro_op) = self.pipeline.pop_front() {
             match micro_op {
                 MicroOp::NOP => {}
-                MicroOp::Move { dest, src } => {
-                    self.store_reg8(dest, self.load_reg8(src));
-                }
-                MicroOp::LoadRegLit { reg, literal } => {
-                    self.store_reg8(reg, literal);
+                MicroOp::Move8Bits {
+                    destination,
+                    source,
+                } => {
+                    let value = match source {
+                        Move8BitsSource::Register(reg) => self.load_reg8(reg),
+                        Move8BitsSource::Literal(lit) => lit,
+                        Move8BitsSource::Indirect(addr) => {
+                            self.memory.read_memory(self.load_reg16(addr))
+                        }
+                        Move8BitsSource::Address(addr) => self.memory.read_memory(addr),
+                    };
+
+                    match destination {
+                        Move8BitsDestination::Register(reg) => {
+                            self.store_reg8(reg, value);
+                        }
+                        Move8BitsDestination::Indirect(addr) => {
+                            self.memory.write_memory(self.load_reg16(addr), value);
+                        }
+                        Move8BitsDestination::Address(addr) => {
+                            self.memory.write_memory(addr, value);
+                        }
+                    }
                 }
                 MicroOp::LoadReg16Lit { reg, literal } => {
                     self.store_reg16(reg, literal);
@@ -380,12 +399,6 @@ impl<M: Memory> CPU<M> {
                     self.reg_a = res;
                     self.update_flags_arith(res, true, carry, half_carry);
                 }
-                MicroOp::WriteMemLit { addr, reg } => {
-                    self.memory.write_memory(addr, self.load_reg8(reg));
-                }
-                MicroOp::WriteLitAt { addr, literal } => {
-                    self.memory.write_memory(self.load_reg16(addr), literal);
-                }
                 MicroOp::WriteMem {
                     addr,
                     reg,
@@ -400,10 +413,6 @@ impl<M: Memory> CPU<M> {
                 MicroOp::WriteMemZeroPage { reg_offset, reg } => {
                     let addr_value = 0xFF00 + self.load_reg8(reg_offset) as u16;
                     self.memory.write_memory(addr_value, self.load_reg8(reg));
-                }
-                MicroOp::ReadMemLit { reg, addr } => {
-                    let mem_value = self.memory.read_memory(addr);
-                    self.store_reg8(reg, mem_value);
                 }
                 MicroOp::ReadMem { reg, addr, post_op } => {
                     let addr_value = self.load_reg16(addr);
