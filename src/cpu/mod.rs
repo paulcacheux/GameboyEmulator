@@ -16,9 +16,14 @@ use self::instruction::PrePostOperation;
 bitflags! {
     struct Flags: u8 {
         const ZERO       = 1 << 7;
-        const NEGATIVE    = 1 << 6;
+        const NEGATIVE   = 1 << 6;
         const HALF_CARRY = 1 << 5;
         const CARRY      = 1 << 4;
+
+        const DUMMY3     = 1 << 3;
+        const DUMMY2     = 1 << 2;
+        const DUMMY1     = 1 << 1;
+        const DUMMY0     = 1 << 0;
     }
 }
 
@@ -248,6 +253,9 @@ impl<M: Memory> CPU<M> {
                 reg: Register8::L,
                 literal: self.fetch_and_advance(),
             },
+            0x29 => Instruction::AddHLWithReg {
+                reg: Register16::HL,
+            },
             0x30 => Instruction::JumpRelative {
                 condition: Some(JumpCondition::NonCarry),
                 offset: self.fetch_and_advance() as i8,
@@ -268,6 +276,7 @@ impl<M: Memory> CPU<M> {
                 addr: Register16::HL,
                 literal: self.fetch_and_advance(),
             },
+            0x3C => Instruction::IncReg8 { reg: Register8::A },
             0x3D => Instruction::DecReg8 { reg: Register8::A },
             0x3E => Instruction::LoadLiteralIntoReg8 {
                 reg: Register8::A,
@@ -361,6 +370,11 @@ impl<M: Memory> CPU<M> {
                 dest: Register8::A,
                 src: Register8::L,
             },
+            0x7E => Instruction::ReadIndirectToReg8 {
+                reg: Register8::A,
+                addr: Register16::HL,
+                post_op: None,
+            },
             0x86 => Instruction::AddAWithIndirect {
                 addr: Register16::HL,
             },
@@ -376,6 +390,7 @@ impl<M: Memory> CPU<M> {
             },
             0xAF => Instruction::XorAWithReg8 { reg: Register8::A },
             0xB1 => Instruction::OrAWithReg8 { reg: Register8::C },
+            0xBB => Instruction::CompareAWithReg { reg: Register8::E },
             0xBE => Instruction::CompareAWithIndirect {
                 addr: Register16::HL,
             },
@@ -386,7 +401,12 @@ impl<M: Memory> CPU<M> {
             0xC1 => Instruction::PopReg16 {
                 reg: Register16::BC,
             },
+            0xC2 => Instruction::JumpAbsolute {
+                condition: Some(JumpCondition::NonZero),
+                addr: self.fetch_and_advance_u16(),
+            },
             0xC3 => Instruction::JumpAbsolute {
+                condition: None,
                 addr: self.fetch_and_advance_u16(),
             },
             0xC4 => Instruction::CallAddr {
@@ -452,6 +472,9 @@ impl<M: Memory> CPU<M> {
             },
             0xE6 => Instruction::AndAWithLiteral {
                 literal: self.fetch_and_advance(),
+            },
+            0xE9 => Instruction::JumpRegister16 {
+                reg: Register16::HL,
             },
             0xEA => Instruction::WriteReg8ValueAtAddress {
                 addr: self.fetch_and_advance_u16(),
@@ -532,6 +555,12 @@ impl<M: Memory> CPU<M> {
                         }
                     }
                 }
+                MicroOp::Move16Bits {
+                    destination,
+                    source,
+                } => {
+                    self.store_reg16(destination, self.load_reg16(source));
+                }
                 MicroOp::LoadReg16Lit { reg, literal } => {
                     self.store_reg16(reg, literal);
                 }
@@ -567,6 +596,23 @@ impl<M: Memory> CPU<M> {
 
                     self.reg_a = res;
                     self.update_flags_arith(res, false, carry, half_carry);
+                }
+                MicroOp::AddHL { rhs } => {
+                    let hl_value = self.load_reg16(Register16::HL);
+                    let rhs_value = self.load_reg16(rhs);
+
+                    let (res, carry) = hl_value.overflowing_add(rhs_value);
+                    let half_carry = check_half_carry_16bits(hl_value, rhs_value);
+
+                    self.store_reg16(Register16::HL, res);
+
+                    self.flags = self.flags & Flags::ZERO;
+                    if half_carry {
+                        self.flags |= Flags::HALF_CARRY;
+                    }
+                    if carry {
+                        self.flags |= Flags::CARRY;
+                    }
                 }
                 MicroOp::AdcA { rhs } => {
                     let a_value = self.reg_a;
@@ -693,11 +739,9 @@ impl<M: Memory> CPU<M> {
                         half_carry,
                     );
                 }
-                MicroOp::CompareALit { literal } => {
-                    self.compare_a(literal);
-                }
-                MicroOp::CompareAIndirect { addr } => {
-                    self.compare_a(self.memory.read_memory(self.load_reg16(addr)));
+                MicroOp::CompareA { rhs } => {
+                    let value = self.source_8bits_to_value(rhs);
+                    self.compare_a(value);
                 }
                 MicroOp::RotateLeftThroughCarry { reg, set_zero } => {
                     let value = self.load_reg8(reg);
@@ -794,6 +838,10 @@ impl<M: Memory> CPU<M> {
 
 fn check_half_carry(a: u8, b: u8) -> bool {
     (((a & 0xf) + (b & 0xf)) & 0x10) == 0x10
+}
+
+fn check_half_carry_16bits(a: u16, b: u16) -> bool {
+    (((a & 0xFF) + (b & 0xFF)) & 0x100) == 0x100
 }
 
 fn check_half_carry_sub(a: u8, b: u8) -> bool {

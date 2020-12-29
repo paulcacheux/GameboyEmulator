@@ -45,6 +45,9 @@ pub enum Instruction {
     AddAWithIndirect {
         addr: Register16,
     },
+    AddHLWithReg {
+        reg: Register16,
+    },
     AdcAWithLiteral {
         literal: u8,
     },
@@ -110,7 +113,11 @@ pub enum Instruction {
         offset: i8,
     },
     JumpAbsolute {
+        condition: Option<JumpCondition>,
         addr: u16,
+    },
+    JumpRegister16 {
+        reg: Register16,
     },
     IncReg16 {
         reg: Register16,
@@ -126,6 +133,9 @@ pub enum Instruction {
     },
     CompareAWithLiteral {
         literal: u8,
+    },
+    CompareAWithReg {
+        reg: Register8,
     },
     CompareAWithIndirect {
         addr: Register16,
@@ -222,6 +232,9 @@ impl fmt::Display for Instruction {
             Instruction::AddAWithLiteral { literal } => {
                 write!(f, "ADD A, ${:02x}", literal)
             }
+            Instruction::AddHLWithReg { reg } => {
+                write!(f, "ADD HL, {}", reg)
+            }
             Instruction::AdcAWithLiteral { literal } => {
                 write!(f, "ADC A, ${:02x}", literal)
             }
@@ -299,8 +312,15 @@ impl fmt::Display for Instruction {
                     write!(f, "JR {}", offset) // TODO: change the offset format
                 }
             }
-            Instruction::JumpAbsolute { addr } => {
-                write!(f, "JP ${:04x}", addr)
+            Instruction::JumpAbsolute { condition, addr } => {
+                if let Some(cond) = condition {
+                    write!(f, "JP {}, ${:04x}", cond, addr)
+                } else {
+                    write!(f, "JP ${:04x}", addr)
+                }
+            }
+            Instruction::JumpRegister16 { reg } => {
+                write!(f, "JP {}", reg)
             }
             Instruction::IncReg16 { reg } => {
                 write!(f, "INC {}", reg)
@@ -316,6 +336,9 @@ impl fmt::Display for Instruction {
             }
             Instruction::CompareAWithLiteral { literal } => {
                 write!(f, "CP ${:02x}", literal)
+            }
+            Instruction::CompareAWithReg { reg } => {
+                write!(f, "CP {}", reg)
             }
             Instruction::CompareAWithIndirect { addr } => {
                 write!(f, "CP ({})", addr)
@@ -406,6 +429,9 @@ impl Instruction {
                         rhs: literal.into(),
                     },
                 ]
+            }
+            Instruction::AddHLWithReg { reg } => {
+                vec![MicroOp::NOP, MicroOp::AddHL { rhs: reg }]
             }
             Instruction::AdcAWithLiteral { literal } => {
                 vec![
@@ -630,12 +656,32 @@ impl Instruction {
                     vec![MicroOp::NOP, MicroOp::RelativeJump(offset)]
                 }
             }
-            Instruction::JumpAbsolute { addr } => vec![
-                MicroOp::NOP,
-                MicroOp::NOP,
-                simpl::load_literal_into_reg8(addr as u8, Register8::PCLow),
-                simpl::load_literal_into_reg8((addr >> 8) as u8, Register8::PCHigh),
-            ],
+            Instruction::JumpAbsolute { condition, addr } => {
+                if let Some(cond) = condition {
+                    vec![
+                        MicroOp::NOP,
+                        MicroOp::CheckFlags {
+                            condition: cond,
+                            true_ops: vec![
+                                simpl::load_literal_into_reg8(addr as u8, Register8::PCLow),
+                                simpl::load_literal_into_reg8((addr >> 8) as u8, Register8::PCHigh),
+                            ],
+                            false_ops: vec![MicroOp::NOP],
+                        },
+                    ]
+                } else {
+                    vec![
+                        MicroOp::NOP,
+                        MicroOp::NOP,
+                        simpl::load_literal_into_reg8(addr as u8, Register8::PCLow),
+                        simpl::load_literal_into_reg8((addr >> 8) as u8, Register8::PCHigh),
+                    ]
+                }
+            }
+            Instruction::JumpRegister16 { reg } => vec![MicroOp::Move16Bits {
+                destination: Register16::PC,
+                source: reg,
+            }],
             Instruction::IncReg16 { reg } => vec![MicroOp::NOP, MicroOp::IncReg16 { reg }],
             Instruction::IncReg8 { reg } => vec![MicroOp::IncReg { reg }],
             Instruction::DecReg8 { reg } => vec![MicroOp::DecReg { reg }],
@@ -643,10 +689,21 @@ impl Instruction {
                 vec![MicroOp::NOP, MicroOp::NOP, MicroOp::DecIndirect { addr }]
             }
             Instruction::CompareAWithLiteral { literal } => {
-                vec![MicroOp::NOP, MicroOp::CompareALit { literal }]
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::CompareA {
+                        rhs: literal.into(),
+                    },
+                ]
             }
+            Instruction::CompareAWithReg { reg } => vec![MicroOp::CompareA { rhs: reg.into() }],
             Instruction::CompareAWithIndirect { addr } => {
-                vec![MicroOp::NOP, MicroOp::CompareAIndirect { addr }]
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::CompareA {
+                        rhs: Source8bits::Indirect(addr),
+                    },
+                ]
             }
             Instruction::RotateLeftThroughCarryA => vec![MicroOp::RotateLeftThroughCarry {
                 reg: Register8::A,

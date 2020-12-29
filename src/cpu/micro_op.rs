@@ -35,6 +35,10 @@ pub enum MicroOp {
         destination: Destination8Bits,
         source: Source8bits,
     },
+    Move16Bits {
+        destination: Register16,
+        source: Register16,
+    },
     LoadReg16Lit {
         reg: Register16,
         literal: u16,
@@ -50,6 +54,9 @@ pub enum MicroOp {
     },
     AddA {
         rhs: Source8bits,
+    },
+    AddHL {
+        rhs: Register16,
     },
     AdcA {
         rhs: Source8bits,
@@ -88,11 +95,8 @@ pub enum MicroOp {
     DecIndirect {
         addr: Register16,
     },
-    CompareALit {
-        literal: u8,
-    },
-    CompareAIndirect {
-        addr: Register16,
+    CompareA {
+        rhs: Source8bits,
     },
     RotateLeftThroughCarry {
         reg: Register8,
