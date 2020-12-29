@@ -1,7 +1,7 @@
 use std::fmt;
 
 use super::micro_op::simpl;
-use super::{MicroOp, Move8BitsDestination, Move8BitsSource, Register16, Register8};
+use super::{Destination8Bits, MicroOp, Register16, Register8, Source8bits};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Instruction {
@@ -30,11 +30,20 @@ pub enum Instruction {
     XorAWithReg8 {
         reg: Register8,
     },
+    XorAWithIndirect {
+        addr: Register16,
+    },
+    AddAWithLiteral {
+        literal: u8,
+    },
     AddAWithIndirect {
         addr: Register16,
     },
     SubAWithReg8 {
         reg: Register8,
+    },
+    SubAWithLiteral {
+        literal: u8,
     },
     WriteReg8ValueAtAddress {
         addr: u16,
@@ -81,6 +90,7 @@ pub enum Instruction {
         bit: u8,
     },
     CallAddr {
+        condition: Option<JumpCondition>,
         addr: u16,
     },
     Return,
@@ -176,11 +186,20 @@ impl fmt::Display for Instruction {
             Instruction::XorAWithReg8 { reg } => {
                 write!(f, "XOR A, {}", reg)
             }
+            Instruction::XorAWithIndirect { addr } => {
+                write!(f, "XOR A, ({})", addr)
+            }
             Instruction::AddAWithIndirect { addr } => {
                 write!(f, "ADD A, ({})", addr)
             }
+            Instruction::AddAWithLiteral { literal } => {
+                write!(f, "ADD A, ${:02x}", literal)
+            }
             Instruction::SubAWithReg8 { reg } => {
                 write!(f, "SUB A, {}", reg)
+            }
+            Instruction::SubAWithLiteral { literal } => {
+                write!(f, "SUB A, ${:02x}", literal)
             }
             Instruction::WriteReg8ValueAtAddress { addr, reg } => {
                 write!(f, "LD (${:04x}), {}", addr, reg)
@@ -229,7 +248,13 @@ impl fmt::Display for Instruction {
                 write!(f, "POP {}", reg)
             }
             Instruction::BitTest { reg, bit } => write!(f, "BIT {}, {}", bit, reg),
-            Instruction::CallAddr { addr } => write!(f, "CALL ${:04x}", addr),
+            Instruction::CallAddr { condition, addr } => {
+                if let Some(cond) = condition {
+                    write!(f, "CALL {}, ${:04x}", cond, addr)
+                } else {
+                    write!(f, "CALL ${:04x}", addr)
+                }
+            }
             Instruction::Return => write!(f, "RET"),
             Instruction::JumpRelative { condition, offset } => {
                 if let Some(cond) = condition {
@@ -283,19 +308,53 @@ impl Instruction {
                     simpl::load_literal_into_reg8((literal >> 8) as u8, reg.higher_half()),
                 ]
             }
-            Instruction::AndAWithReg8 { reg } => vec![MicroOp::AndAReg { reg }],
+            Instruction::AndAWithReg8 { reg } => vec![MicroOp::AndA { rhs: reg.into() }],
             Instruction::AndAWithLiteral { literal } => {
-                vec![MicroOp::NOP, MicroOp::AndALit { literal }]
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::AndA {
+                        rhs: literal.into(),
+                    },
+                ]
             }
-            Instruction::OrAWithReg8 { reg } => vec![MicroOp::OrAReg { reg }],
+            Instruction::OrAWithReg8 { reg } => vec![MicroOp::OrA { rhs: reg.into() }],
             Instruction::XorAWithReg8 { reg } => {
-                vec![MicroOp::XorAReg { reg }]
+                vec![MicroOp::XorA { rhs: reg.into() }]
+            }
+            Instruction::XorAWithIndirect { addr } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::XorA {
+                        rhs: Source8bits::Indirect(addr),
+                    },
+                ]
             }
             Instruction::AddAWithIndirect { addr } => {
-                vec![MicroOp::NOP, MicroOp::AddAIndirect { addr }]
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::AddA {
+                        rhs: Source8bits::Indirect(addr),
+                    },
+                ]
+            }
+            Instruction::AddAWithLiteral { literal } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::AddA {
+                        rhs: literal.into(),
+                    },
+                ]
             }
             Instruction::SubAWithReg8 { reg } => {
-                vec![MicroOp::SubAReg { reg }]
+                vec![MicroOp::SubA { rhs: reg.into() }]
+            }
+            Instruction::SubAWithLiteral { literal } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::SubA {
+                        rhs: literal.into(),
+                    },
+                ]
             }
             Instruction::WriteReg8ValueAtAddress { addr, reg } => {
                 vec![
@@ -303,8 +362,8 @@ impl Instruction {
                     MicroOp::NOP,
                     MicroOp::NOP,
                     MicroOp::Move8Bits {
-                        destination: Move8BitsDestination::Address(addr),
-                        source: Move8BitsSource::Register(reg),
+                        destination: Destination8Bits::Address(addr),
+                        source: reg.into(),
                     },
                 ]
             }
@@ -313,8 +372,8 @@ impl Instruction {
                     MicroOp::NOP,
                     MicroOp::NOP,
                     MicroOp::Move8Bits {
-                        destination: Move8BitsDestination::Indirect(addr),
-                        source: Move8BitsSource::Literal(literal),
+                        destination: Destination8Bits::Indirect(addr),
+                        source: literal.into(),
                     },
                 ]
             }
@@ -338,8 +397,8 @@ impl Instruction {
                     MicroOp::NOP,
                     MicroOp::NOP,
                     MicroOp::Move8Bits {
-                        destination: Move8BitsDestination::Address(0xFF00 + lit_offset as u16),
-                        source: Move8BitsSource::Register(reg),
+                        destination: Destination8Bits::Address(0xFF00 + lit_offset as u16),
+                        source: reg.into(),
                     },
                 ]
             }
@@ -347,15 +406,15 @@ impl Instruction {
                 MicroOp::NOP,
                 MicroOp::NOP,
                 MicroOp::Move8Bits {
-                    destination: Move8BitsDestination::Register(reg),
-                    source: Move8BitsSource::Address(0xFF00 + lit_offset as u16),
+                    destination: Destination8Bits::Register(reg),
+                    source: Source8bits::Address(0xFF00 + lit_offset as u16),
                 },
             ],
             Instruction::ReadAtAddressToReg8 { reg, addr } => vec![
                 MicroOp::NOP,
                 MicroOp::Move8Bits {
-                    destination: Move8BitsDestination::Register(reg),
-                    source: Move8BitsSource::Address(addr),
+                    destination: Destination8Bits::Register(reg),
+                    source: Source8bits::Address(addr),
                 },
             ],
 
@@ -392,28 +451,62 @@ impl Instruction {
                 },
             ],
             Instruction::BitTest { reg, bit } => vec![MicroOp::NOP, MicroOp::BitTest { reg, bit }],
-            Instruction::CallAddr { addr } => vec![
-                // TODO: check if this is really the correct order
-                MicroOp::NOP,
-                MicroOp::NOP,
-                MicroOp::NOP,
-                MicroOp::WriteMem {
-                    addr: Register16::SP,
-                    reg: Register8::PCHigh,
-                    pre_op: Some(PrePostOperation::Dec),
-                    post_op: None,
-                },
-                MicroOp::WriteMem {
-                    addr: Register16::SP,
-                    reg: Register8::PCLow,
-                    pre_op: Some(PrePostOperation::Dec),
-                    post_op: None,
-                },
-                MicroOp::LoadReg16Lit {
-                    reg: Register16::PC,
-                    literal: addr,
-                },
-            ],
+            Instruction::CallAddr { condition, addr } => {
+                if let Some(cond) = condition {
+                    //
+                    vec![
+                        // TODO: check if this is really the correct order
+                        MicroOp::NOP,
+                        MicroOp::NOP,
+                        MicroOp::CheckFlags {
+                            condition: cond,
+                            true_ops: vec![
+                                MicroOp::WriteMem {
+                                    addr: Register16::SP,
+                                    reg: Register8::PCHigh,
+                                    pre_op: Some(PrePostOperation::Dec),
+                                    post_op: None,
+                                },
+                                MicroOp::WriteMem {
+                                    addr: Register16::SP,
+                                    reg: Register8::PCLow,
+                                    pre_op: Some(PrePostOperation::Dec),
+                                    post_op: None,
+                                },
+                                MicroOp::LoadReg16Lit {
+                                    reg: Register16::PC,
+                                    literal: addr,
+                                },
+                            ],
+                            false_ops: vec![],
+                        },
+                    ]
+                } else {
+                    vec![
+                        // TODO: check if this is really the correct order
+                        MicroOp::NOP,
+                        MicroOp::NOP,
+                        MicroOp::NOP,
+                        MicroOp::WriteMem {
+                            addr: Register16::SP,
+                            reg: Register8::PCHigh,
+                            pre_op: Some(PrePostOperation::Dec),
+                            post_op: None,
+                        },
+                        MicroOp::WriteMem {
+                            addr: Register16::SP,
+                            reg: Register8::PCLow,
+                            pre_op: Some(PrePostOperation::Dec),
+                            post_op: None,
+                        },
+                        MicroOp::LoadReg16Lit {
+                            reg: Register16::PC,
+                            literal: addr,
+                        },
+                    ]
+                }
+            }
+
             Instruction::Return => vec![
                 MicroOp::NOP,
                 MicroOp::NOP,
@@ -428,15 +521,20 @@ impl Instruction {
                     post_op: Some(PrePostOperation::Inc),
                 },
             ],
-            Instruction::JumpRelative { condition, offset } => vec![
-                MicroOp::NOP,
+            Instruction::JumpRelative { condition, offset } => {
                 if let Some(cond) = condition {
-                    MicroOp::CheckFlags(cond)
+                    vec![
+                        MicroOp::NOP,
+                        MicroOp::CheckFlags {
+                            condition: cond,
+                            true_ops: vec![MicroOp::RelativeJump(offset)],
+                            false_ops: vec![],
+                        },
+                    ]
                 } else {
-                    MicroOp::NOP
-                },
-                MicroOp::RelativeJump(offset),
-            ],
+                    vec![MicroOp::NOP, MicroOp::RelativeJump(offset)]
+                }
+            }
             Instruction::JumpAbsolute { addr } => vec![
                 MicroOp::NOP,
                 MicroOp::NOP,

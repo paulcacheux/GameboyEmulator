@@ -1,4 +1,4 @@
-use crate::{memory::Memory, utils::combine};
+use crate::{main, memory::Memory, utils::combine};
 use bitflags::bitflags;
 use std::collections::VecDeque;
 
@@ -8,7 +8,7 @@ mod register;
 
 use instruction::{Instruction, JumpCondition};
 use log::{debug, info};
-use micro_op::{MicroOp, Move8BitsDestination, Move8BitsSource};
+use micro_op::{Destination8Bits, MicroOp, Source8bits};
 use register::{Register16, Register8};
 
 use self::instruction::PrePostOperation;
@@ -228,6 +228,10 @@ impl<M: Memory> CPU<M> {
             },
             0x24 => Instruction::IncReg8 { reg: Register8::H },
             0x25 => Instruction::DecReg8 { reg: Register8::H },
+            0x26 => Instruction::LoadLiteralIntoReg8 {
+                reg: Register8::H,
+                literal: self.fetch_and_advance(),
+            },
             0x28 => Instruction::JumpRelative {
                 condition: Some(JumpCondition::Zero),
                 offset: self.fetch_and_advance() as i8,
@@ -237,6 +241,8 @@ impl<M: Memory> CPU<M> {
                 addr: Register16::HL,
                 post_op: Some(PrePostOperation::Inc),
             },
+            0x2C => Instruction::IncReg8 { reg: Register8::L },
+            0x2D => Instruction::DecReg8 { reg: Register8::L },
             0x2E => Instruction::LoadLiteralIntoReg8 {
                 reg: Register8::L,
                 literal: self.fetch_and_advance(),
@@ -259,13 +265,28 @@ impl<M: Memory> CPU<M> {
                 reg: Register8::A,
                 literal: self.fetch_and_advance(),
             },
+            0x46 => Instruction::ReadIndirectToReg8 {
+                reg: Register8::B,
+                addr: Register16::HL,
+                post_op: None,
+            },
             0x47 => Instruction::Move {
                 dest: Register8::B,
                 src: Register8::A,
             },
+            0x4E => Instruction::ReadIndirectToReg8 {
+                reg: Register8::C,
+                addr: Register16::HL,
+                post_op: None,
+            },
             0x4F => Instruction::Move {
                 dest: Register8::C,
                 src: Register8::A,
+            },
+            0x56 => Instruction::ReadIndirectToReg8 {
+                reg: Register8::D,
+                addr: Register16::HL,
+                post_op: None,
             },
             0x57 => Instruction::Move {
                 dest: Register8::D,
@@ -306,19 +327,30 @@ impl<M: Memory> CPU<M> {
             0xAB => Instruction::XorAWithReg8 { reg: Register8::E },
             0xAC => Instruction::XorAWithReg8 { reg: Register8::H },
             0xAD => Instruction::XorAWithReg8 { reg: Register8::L },
+            0xAE => Instruction::XorAWithIndirect {
+                addr: Register16::HL,
+            },
             0xAF => Instruction::XorAWithReg8 { reg: Register8::A },
             0xB1 => Instruction::OrAWithReg8 { reg: Register8::C },
             0xBE => Instruction::CompareAWithIndirect {
                 addr: Register16::HL,
             },
+            0xB7 => Instruction::OrAWithReg8 { reg: Register8::A },
             0xC1 => Instruction::PopReg16 {
                 reg: Register16::BC,
             },
             0xC3 => Instruction::JumpAbsolute {
                 addr: self.fetch_and_advance_u16(),
             },
+            0xC4 => Instruction::CallAddr {
+                condition: Some(JumpCondition::NonZero),
+                addr: self.fetch_and_advance_u16(),
+            },
             0xC5 => Instruction::PushReg16 {
                 reg: Register16::BC,
+            },
+            0xC6 => Instruction::AddAWithLiteral {
+                literal: self.fetch_and_advance(),
             },
             0xC9 => Instruction::Return,
             0xCB => {
@@ -333,7 +365,14 @@ impl<M: Memory> CPU<M> {
                 }
             }
             0xCD => Instruction::CallAddr {
+                condition: None,
                 addr: self.fetch_and_advance_u16(),
+            },
+            0xD5 => Instruction::PushReg16 {
+                reg: Register16::DE,
+            },
+            0xD6 => Instruction::SubAWithLiteral {
+                literal: self.fetch_and_advance(),
             },
             0xE0 => Instruction::WriteReg8ValueAtZeroPageOffsetLiteral {
                 lit_offset: self.fetch_and_advance(),
@@ -391,6 +430,15 @@ impl<M: Memory> CPU<M> {
         }
     }
 
+    fn source_8bits_to_value(&self, src: Source8bits) -> u8 {
+        match src {
+            Source8bits::Register(reg) => self.load_reg8(reg),
+            Source8bits::Literal(lit) => lit,
+            Source8bits::Indirect(addr) => self.memory.read_memory(self.load_reg16(addr)),
+            Source8bits::Address(addr) => self.memory.read_memory(addr),
+        }
+    }
+
     pub fn step(&mut self) {
         if self.pipeline.is_empty() {
             let instruction = self.fetch_and_decode();
@@ -405,23 +453,16 @@ impl<M: Memory> CPU<M> {
                     destination,
                     source,
                 } => {
-                    let value = match source {
-                        Move8BitsSource::Register(reg) => self.load_reg8(reg),
-                        Move8BitsSource::Literal(lit) => lit,
-                        Move8BitsSource::Indirect(addr) => {
-                            self.memory.read_memory(self.load_reg16(addr))
-                        }
-                        Move8BitsSource::Address(addr) => self.memory.read_memory(addr),
-                    };
+                    let value = self.source_8bits_to_value(source);
 
                     match destination {
-                        Move8BitsDestination::Register(reg) => {
+                        Destination8Bits::Register(reg) => {
                             self.store_reg8(reg, value);
                         }
-                        Move8BitsDestination::Indirect(addr) => {
+                        Destination8Bits::Indirect(addr) => {
                             self.memory.write_memory(self.load_reg16(addr), value);
                         }
-                        Move8BitsDestination::Address(addr) => {
+                        Destination8Bits::Address(addr) => {
                             self.memory.write_memory(addr, value);
                         }
                     }
@@ -429,39 +470,32 @@ impl<M: Memory> CPU<M> {
                 MicroOp::LoadReg16Lit { reg, literal } => {
                     self.store_reg16(reg, literal);
                 }
-                MicroOp::AndAReg { reg } => {
-                    self.reg_a &= self.load_reg8(reg);
+                MicroOp::AndA { rhs } => {
+                    self.reg_a &= self.source_8bits_to_value(rhs);
                     self.flags = Flags::HALF_CARRY;
                     if self.reg_a == 0 {
                         self.flags |= Flags::ZERO;
                     }
                 }
-                MicroOp::AndALit { literal } => {
-                    self.reg_a &= literal;
-                    self.flags = Flags::HALF_CARRY;
-                    if self.reg_a == 0 {
-                        self.flags |= Flags::ZERO;
-                    }
-                }
-                MicroOp::OrAReg { reg } => {
-                    self.reg_a |= self.load_reg8(reg);
+                MicroOp::OrA { rhs } => {
+                    self.reg_a |= self.source_8bits_to_value(rhs);
                     self.flags = if self.reg_a == 0 {
                         Flags::ZERO
                     } else {
                         Flags::empty()
                     };
                 }
-                MicroOp::XorAReg { reg } => {
-                    self.reg_a ^= self.load_reg8(reg);
+                MicroOp::XorA { rhs } => {
+                    self.reg_a ^= self.source_8bits_to_value(rhs);
                     self.flags = if self.reg_a == 0 {
                         Flags::ZERO
                     } else {
                         Flags::empty()
                     };
                 }
-                MicroOp::AddAIndirect { addr } => {
+                MicroOp::AddA { rhs } => {
                     let a_value = self.reg_a;
-                    let rhs_value = self.memory.read_memory(self.load_reg16(addr));
+                    let rhs_value = self.source_8bits_to_value(rhs);
 
                     let (res, carry) = a_value.overflowing_add(rhs_value);
                     let half_carry = check_half_carry(a_value, rhs_value);
@@ -469,9 +503,9 @@ impl<M: Memory> CPU<M> {
                     self.reg_a = res;
                     self.update_flags_arith(res, false, carry, half_carry);
                 }
-                MicroOp::SubAReg { reg } => {
+                MicroOp::SubA { rhs } => {
                     let a_value = self.reg_a;
-                    let rhs_value = self.load_reg8(reg);
+                    let rhs_value = self.source_8bits_to_value(rhs);
 
                     let (res, carry) = a_value.overflowing_sub(rhs_value);
                     let half_carry = check_half_carry_sub(a_value, rhs_value);
@@ -505,7 +539,11 @@ impl<M: Memory> CPU<M> {
                     let rest = Flags::HALF_CARRY | (self.flags & Flags::CARRY);
                     self.flags = if is_set { rest } else { Flags::ZERO | rest };
                 }
-                MicroOp::CheckFlags(condition) => {
+                MicroOp::CheckFlags {
+                    condition,
+                    true_ops,
+                    false_ops,
+                } => {
                     let cond_true = match condition {
                         instruction::JumpCondition::NonZero => !self.flags.contains(Flags::ZERO),
                         instruction::JumpCondition::Zero => self.flags.contains(Flags::ZERO),
@@ -513,8 +551,9 @@ impl<M: Memory> CPU<M> {
                         instruction::JumpCondition::Carry => self.flags.contains(Flags::CARRY),
                     };
 
-                    if !cond_true {
-                        self.pipeline.pop_front();
+                    let to_prepend_ops = if cond_true { true_ops } else { false_ops };
+                    for op in to_prepend_ops.into_iter().rev() {
+                        self.pipeline.push_front(op);
                     }
                 }
                 MicroOp::RelativeJump(offset) => {

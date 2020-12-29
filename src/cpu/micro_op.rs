@@ -1,7 +1,7 @@
 use super::{JumpCondition, PrePostOperation, Register16, Register8};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Move8BitsDestination {
+pub enum Destination8Bits {
     Register(Register8),
     Indirect(Register16),
     Address(u16),
@@ -9,41 +9,50 @@ pub enum Move8BitsDestination {
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Move8BitsSource {
+pub enum Source8bits {
     Register(Register8),
     Indirect(Register16),
     Address(u16),
     Literal(u8),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+impl From<Register8> for Source8bits {
+    fn from(reg: Register8) -> Self {
+        Source8bits::Register(reg)
+    }
+}
+
+impl From<u8> for Source8bits {
+    fn from(literal: u8) -> Self {
+        Source8bits::Literal(literal)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MicroOp {
     NOP,
     Move8Bits {
-        destination: Move8BitsDestination,
-        source: Move8BitsSource,
+        destination: Destination8Bits,
+        source: Source8bits,
     },
     LoadReg16Lit {
         reg: Register16,
         literal: u16,
     },
-    AndAReg {
-        reg: Register8,
+    AndA {
+        rhs: Source8bits,
     },
-    AndALit {
-        literal: u8,
+    OrA {
+        rhs: Source8bits,
     },
-    OrAReg {
-        reg: Register8,
+    XorA {
+        rhs: Source8bits,
     },
-    XorAReg {
-        reg: Register8,
+    AddA {
+        rhs: Source8bits,
     },
-    AddAIndirect {
-        addr: Register16,
-    },
-    SubAReg {
-        reg: Register8,
+    SubA {
+        rhs: Source8bits,
     },
     WriteMem {
         addr: Register16,
@@ -83,7 +92,11 @@ pub enum MicroOp {
         reg: Register8,
         set_zero: bool,
     },
-    CheckFlags(JumpCondition),
+    CheckFlags {
+        condition: JumpCondition,
+        true_ops: Vec<MicroOp>,
+        false_ops: Vec<MicroOp>,
+    },
     RelativeJump(i8),
     EnableInterrupts,
     DisableInterrupts,
@@ -94,15 +107,15 @@ pub mod simpl {
 
     pub fn load_literal_into_reg8(literal: u8, reg: Register8) -> MicroOp {
         MicroOp::Move8Bits {
-            destination: Move8BitsDestination::Register(reg),
-            source: Move8BitsSource::Literal(literal),
+            destination: Destination8Bits::Register(reg),
+            source: Source8bits::Literal(literal),
         }
     }
 
     pub fn move_micro_op(destination: Register8, src: Register8) -> MicroOp {
         MicroOp::Move8Bits {
-            destination: Move8BitsDestination::Register(destination),
-            source: Move8BitsSource::Register(src),
+            destination: Destination8Bits::Register(destination),
+            source: Source8bits::Register(src),
         }
     }
 }
