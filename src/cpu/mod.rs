@@ -19,11 +19,6 @@ bitflags! {
         const NEGATIVE   = 1 << 6;
         const HALF_CARRY = 1 << 5;
         const CARRY      = 1 << 4;
-
-        const DUMMY3     = 1 << 3;
-        const DUMMY2     = 1 << 2;
-        const DUMMY1     = 1 << 1;
-        const DUMMY0     = 1 << 0;
     }
 }
 
@@ -103,9 +98,7 @@ impl<M: Memory> CPU<M> {
             Register8::PCLow => {
                 self.pc = (self.pc & 0xFF00) | (value as u16);
             }
-            Register8::Flags => {
-                self.flags = Flags::from_bits(value).expect("Failed to parse flags from bits")
-            }
+            Register8::Flags => self.flags = Flags::from_bits_truncate(value),
         }
     }
 
@@ -124,8 +117,7 @@ impl<M: Memory> CPU<M> {
         match reg {
             Register16::AF => {
                 self.reg_a = (value >> 8) as u8;
-                self.flags =
-                    Flags::from_bits(value as u8).expect("Failed to parse flags from bits");
+                self.flags = Flags::from_bits_truncate(value as u8);
             }
             Register16::BC => {
                 self.reg_b = (value >> 8) as u8;
