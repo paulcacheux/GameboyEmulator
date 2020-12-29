@@ -39,10 +39,14 @@ const BG_PALETTE_DATA_ADDR: u16 = 0xFF47;
 pub struct PPU<M: Memory> {
     memory: M,
     interrupt_controller: InterruptControllerPtr,
-    current_dot_in_line: u32,
+
+    scan_line: u8,
+    dot_in_line: u32,
+    state: PPUState,
+
     pub previous_frame: [u8; PIXEL_COUNT],
     pub frame: [u8; PIXEL_COUNT],
-    fetcher: FetcherState,
+    fetcher: Option<Fetcher>,
     fifo: VecDeque<Pixel>,
 }
 
@@ -51,10 +55,14 @@ impl<M: Memory> PPU<M> {
         PPU {
             memory,
             interrupt_controller,
-            current_dot_in_line: 0,
+
+            scan_line: 0,
+            dot_in_line: 0,
+            state: PPUState::OAMSearchInit,
+
             previous_frame: [0; PIXEL_COUNT],
             frame: [0; PIXEL_COUNT],
-            fetcher: FetcherState::Waiting,
+            fetcher: None,
             fifo: VecDeque::new(),
         }
     }
@@ -73,44 +81,33 @@ impl<M: Memory> PPU<M> {
             .expect("Failed to read control_reg")
     }
 
-    fn current_line(&self) -> u8 {
-        self.memory.read_memory(LCD_LY_ADDR)
-    }
+    fn update_registers(&mut self) {
+        // status reg
+        let coincidence = self.scan_line == self.memory.read_memory(LCD_LYC_ADDR);
 
-    fn current_mode(&self) -> Mode {
-        let current_line = self.current_line();
-        if current_line >= SCREEN_HEIGHT {
-            Mode::VBlank
-        } else if self.current_dot_in_line < 80 {
-            Mode::OAMSearch
-        } else if self.current_dot_in_line < HBLANK_START {
-            Mode::LCDTransfer
-        } else {
-            Mode::HBlank
-        }
-    }
-
-    fn update_status_reg(&mut self) {
-        let coincidence = self.current_line() == self.memory.read_memory(LCD_LYC_ADDR);
-
-        let updated_part = ((coincidence as u8) << 3) | (self.current_mode() as u8);
+        let updated_part = ((coincidence as u8) << 3) | (self.state.mode() as u8);
         let old_reg = self.memory.read_memory(LCD_STATUS_REG_ADDR);
         self.memory
             .write_memory(LCD_STATUS_REG_ADDR, (old_reg & 0xF0) | updated_part);
+
+        // LY reg
+
+        self.memory.write_memory(LCD_LY_ADDR, self.scan_line);
     }
 
     fn next_dot(&mut self) {
-        let mut current_line = self.current_line();
-        self.current_dot_in_line += 1;
+        self.dot_in_line += 1;
 
-        if self.current_dot_in_line == DOT_PER_LINE_COUNT {
-            self.current_dot_in_line = 0;
-            current_line += 1;
-            if current_line == SCAN_LINE_COUNT {
-                current_line = 0;
+        if self.dot_in_line == DOT_PER_LINE_COUNT {
+            self.dot_in_line = 0;
+            self.scan_line += 1;
+            if self.scan_line == SCAN_LINE_COUNT {
+                self.scan_line = 0;
             }
-            self.memory.write_memory(LCD_LY_ADDR, current_line);
+            self.memory.write_memory(LCD_LY_ADDR, self.scan_line);
         }
+
+        self.state = PPUState::current_state(self.dot_in_line, self.scan_line);
     }
 
     fn prepare_frame_and_fetcher(&mut self) {
@@ -120,62 +117,69 @@ impl<M: Memory> PPU<M> {
         }
 
         self.fifo.clear();
-        self.fetcher = FetcherState::Waiting;
+
+        let lcdc = self.control_reg();
+        let fetcher = Fetcher::new(
+            if lcdc.contains(ControlReg::BG_TILE_MAP_DISPLAY_SELECT) {
+                0x9C00
+            } else {
+                0x9800
+            },
+            if lcdc.contains(ControlReg::BG_WINDOW_TILE_DATA_SELECT) {
+                AddressingMode::From8000
+            } else {
+                AddressingMode::From8800
+            },
+            self.memory.read_memory(LCD_SCROLL_X_ADDR),
+            self.memory.read_memory(LCD_SCROLL_Y_ADDR),
+            self.scan_line,
+        );
+
+        self.fetcher = Some(fetcher);
     }
 
-    fn next_fetcher_state(&mut self) {
-        let lcdc = self.control_reg();
-        let scan_line = self.current_line();
-        self.fetcher.next_update(lcdc, &mut self.memory, scan_line);
+    fn fill_fifo_if_needed(&mut self) {
+        if self.fifo.len() < 8 {
+            let fetcher = self.fetcher.as_mut().unwrap();
+            self.fifo.extend(&fetcher.fetch_pixels(&mut self.memory));
+        }
     }
 
     fn cycle(&mut self) {
-        self.update_status_reg();
+        self.update_registers();
 
-        let current_mode = self.current_mode();
-        self.interrupt_controller
-            .lock()
-            .unwrap()
-            .ppu_mode_update(current_mode);
+        match self.state {
+            PPUState::OAMSearchInit => {}
+            PPUState::OAMSearch => {}
+            PPUState::TransferInit => {
+                self.prepare_frame_and_fetcher();
+                self.fill_fifo_if_needed();
 
-        match current_mode {
-            Mode::HBlank => {}
-            Mode::VBlank => {}
-            Mode::OAMSearch => {}
-            Mode::LCDTransfer => {
-                if self.current_dot_in_line == 80 {
-                    self.prepare_frame_and_fetcher();
-                } else if self.current_dot_in_line > 80 {
-                    self.next_fetcher_state();
-                    let scan_line = self.current_line();
-
-                    match &mut self.fetcher {
-                        FetcherState::Waiting | FetcherState::Finished => {}
-                        FetcherState::Ready(fetcher) => {
-                            self.fifo.extend(&fetcher.fetch_pixels(&mut self.memory));
-
-                            let scroll_x = self.memory.read_memory(LCD_SCROLL_X_ADDR);
-                            for _ in 0..(scroll_x % 8) {
-                                self.fifo.pop_front();
-                            }
-                        }
-                        FetcherState::Working(fetcher, x) => {
-                            if self.fifo.len() < 8 {
-                                self.fifo.extend(&fetcher.fetch_pixels(&mut self.memory));
-                            }
-
-                            let pixel = self.fifo.pop_front().unwrap();
-                            let offset =
-                                (scan_line as usize) * (SCREEN_WIDTH as usize) + (*x as usize);
-
-                            let bg_palette = self.memory.read_memory(BG_PALETTE_DATA_ADDR);
-                            let actual_color = (bg_palette >> (pixel.color * 2)) & 0b11;
-
-                            self.frame[offset] = actual_color;
-                        }
-                    }
+                let scroll_x = self.memory.read_memory(LCD_SCROLL_X_ADDR);
+                for _ in 0..(scroll_x % 8) {
+                    self.fifo.pop_front();
                 }
             }
+            PPUState::Transfer { x } => {
+                assert!(x < 160);
+
+                self.fill_fifo_if_needed();
+
+                let pixel = self.fifo.pop_front().unwrap();
+                let offset = (self.scan_line as usize) * (SCREEN_WIDTH as usize) + (x as usize);
+
+                let bg_palette = self.memory.read_memory(BG_PALETTE_DATA_ADDR);
+                let actual_color = (bg_palette >> (pixel.color * 2)) & 0b11;
+
+                self.frame[offset] = actual_color;
+            }
+            PPUState::PostTransfer => {}
+            PPUState::HBlankInit => {
+                self.fetcher = None;
+            }
+            PPUState::HBlank => {}
+            PPUState::VBlankInit => self.interrupt_controller.lock().unwrap().request_redraw(),
+            PPUState::VBlank => {}
         }
 
         self.next_dot();
@@ -198,56 +202,59 @@ pub enum Mode {
 }
 
 #[derive(Debug, Clone)]
-enum FetcherState {
-    Waiting,
-    Ready(Fetcher),
-    Working(Fetcher, u8),
-    Finished,
+enum PPUState {
+    OAMSearchInit,
+    OAMSearch,
+    TransferInit,
+    Transfer { x: u8 },
+    PostTransfer,
+    HBlankInit,
+    HBlank,
+    VBlankInit,
+    VBlank,
 }
 
-impl Default for FetcherState {
+impl Default for PPUState {
     fn default() -> Self {
-        FetcherState::Waiting
+        PPUState::OAMSearchInit
     }
 }
 
-impl FetcherState {
-    fn next(self, lcdc: ControlReg, memory: &mut dyn Memory, scan_line: u8) -> Self {
-        match self {
-            FetcherState::Waiting => {
-                let fetcher = Fetcher::new(
-                    if lcdc.contains(ControlReg::BG_TILE_MAP_DISPLAY_SELECT) {
-                        0x9C00
-                    } else {
-                        0x9800
-                    },
-                    if lcdc.contains(ControlReg::BG_WINDOW_TILE_DATA_SELECT) {
-                        AddressingMode::From8000
-                    } else {
-                        AddressingMode::From8800
-                    },
-                    memory.read_memory(LCD_SCROLL_X_ADDR),
-                    memory.read_memory(LCD_SCROLL_Y_ADDR),
-                    scan_line,
-                );
-                FetcherState::Ready(fetcher)
+impl PPUState {
+    fn current_state(dot: u32, scan_line: u8) -> Self {
+        assert!(scan_line < SCAN_LINE_COUNT);
+        assert!(dot < 456);
+
+        if scan_line < SCREEN_HEIGHT {
+            match dot {
+                0 => PPUState::OAMSearchInit,
+                1..=79 => PPUState::OAMSearch,
+                80 => PPUState::TransferInit,
+                81..=240 => PPUState::Transfer { x: dot as u8 - 81 },
+                241..=251 => PPUState::PostTransfer,
+                252 => PPUState::HBlankInit,
+                253..=455 => PPUState::HBlank,
+                _ => unreachable!(),
             }
-            FetcherState::Ready(fetcher) => FetcherState::Working(fetcher, 0),
-            FetcherState::Working(fetcher, x) => {
-                if x + 1 == SCREEN_WIDTH {
-                    FetcherState::Finished
-                } else {
-                    FetcherState::Working(fetcher, x + 1)
-                }
-            }
-            FetcherState::Finished => FetcherState::Finished,
+        } else if scan_line == SCREEN_HEIGHT && dot == 0 {
+            PPUState::VBlankInit
+        } else {
+            PPUState::VBlank
         }
     }
 
-    fn next_update(&mut self, lcdc: ControlReg, memory: &mut dyn Memory, scan_line: u8) {
-        let current = std::mem::take(self);
-        let next = current.next(lcdc, memory, scan_line);
-        let _ = std::mem::replace(self, next);
+    fn mode(&self) -> Mode {
+        match self {
+            PPUState::OAMSearchInit => Mode::OAMSearch,
+            PPUState::OAMSearch => Mode::OAMSearch,
+            PPUState::TransferInit => Mode::LCDTransfer,
+            PPUState::Transfer { .. } => Mode::LCDTransfer,
+            PPUState::PostTransfer => Mode::LCDTransfer,
+            PPUState::HBlankInit => Mode::HBlank,
+            PPUState::HBlank => Mode::HBlank,
+            PPUState::VBlankInit => Mode::VBlank,
+            PPUState::VBlank => Mode::VBlank,
+        }
     }
 }
 

@@ -18,12 +18,7 @@ impl InterruptController {
         }
     }
 
-    pub fn ppu_mode_update(&mut self, mode: Mode) {
-        if self.last_ppu_mode != mode {
-            self.last_ppu_mode = mode;
-            if mode == Mode::VBlank {
-                self.should_redraw = true;
-            }
-        }
+    pub fn request_redraw(&mut self) {
+        self.should_redraw = true;
     }
 }
