@@ -328,7 +328,7 @@ impl<M: Memory> CPU<M> {
         if self.pipeline.is_empty() {
             let pc = self.pc;
             if pc > 0x100 {
-                panic!("End of bootstrap rom")
+                return;
             }
             let instruction = self.fetch_and_decode();
             debug!("{:#06x}: {}", pc, instruction);

@@ -25,7 +25,6 @@ const PIXEL_COUNT: usize = (SCREEN_WIDTH as usize) * (SCREEN_HEIGHT as usize);
 
 const SCAN_LINE_COUNT: u8 = SCREEN_HEIGHT + 10;
 const DOT_PER_LINE_COUNT: u32 = 80 + 172 + 204;
-const HBLANK_START: u32 = 172 + 80;
 
 const LCD_CONTROL_REG_ADDR: u16 = 0xFF40;
 const LCD_STATUS_REG_ADDR: u16 = 0xFF41;
@@ -44,7 +43,6 @@ pub struct PPU<M: Memory> {
     dot_in_line: u32,
     state: PPUState,
 
-    pub previous_frame: [u8; PIXEL_COUNT],
     pub frame: [u8; PIXEL_COUNT],
     fetcher: Option<Fetcher>,
     fifo: VecDeque<Pixel>,
@@ -60,7 +58,6 @@ impl<M: Memory> PPU<M> {
             dot_in_line: 0,
             state: PPUState::OAMSearchInit,
 
-            previous_frame: [0; PIXEL_COUNT],
             frame: [0; PIXEL_COUNT],
             fetcher: None,
             fifo: VecDeque::new(),
@@ -71,7 +68,7 @@ impl<M: Memory> PPU<M> {
         assert_eq!(PIXEL_COUNT * 4, fb.len());
 
         for (i, pixel) in fb.chunks_exact_mut(4).enumerate() {
-            let color = self.previous_frame[i];
+            let color = self.frame[i];
             pixel.copy_from_slice(&pixel_color_to_screen_color(color));
         }
     }
@@ -111,11 +108,6 @@ impl<M: Memory> PPU<M> {
     }
 
     fn prepare_frame_and_fetcher(&mut self) {
-        for (i, pixel) in self.frame.iter_mut().enumerate() {
-            self.previous_frame[i] = *pixel;
-            *pixel = 0;
-        }
-
         self.fifo.clear();
 
         let lcdc = self.control_reg();

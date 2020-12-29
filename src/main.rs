@@ -84,6 +84,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     *control_flow = ControlFlow::Exit;
                 }
             }
+            Event::MainEventsCleared => {
+                for _ in 0..MACHINE_CYCLE_PER_FRAME {
+                    cpu.step();
+                    ppu.step();
+                }
+
+                let mut int_cont = interrupt_controller.lock().unwrap();
+                if int_cont.should_redraw {
+                    window.request_redraw();
+                    int_cont.should_redraw = false;
+                }
+            }
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 ..
@@ -91,23 +103,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 *control_flow = ControlFlow::Exit;
             }
             _ => {}
-        }
-
-        for _ in 0..MACHINE_CYCLE_PER_FRAME {
-            cpu.step();
-            ppu.step();
-            if cpu.pc == 0x00E0 {
-                // ppu::dump_tiles_to_file(&memory, "tile_dump.ppm").expect("Failed to dump tiles");
-                ppu::dump_frame_to_file(&ppu.previous_frame, "frame_dump.ppm")
-                    .expect("Failed to dump frame");
-                *control_flow = ControlFlow::Exit;
-            }
-        }
-
-        let mut int_cont = interrupt_controller.lock().unwrap();
-        if int_cont.should_redraw {
-            window.request_redraw();
-            int_cont.should_redraw = false;
         }
     });
 }
