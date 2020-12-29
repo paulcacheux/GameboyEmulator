@@ -307,6 +307,7 @@ impl<M: Memory> CPU<M> {
             0xAC => Instruction::XorAReg8 { reg: Register8::H },
             0xAD => Instruction::XorAReg8 { reg: Register8::L },
             0xAF => Instruction::XorAReg8 { reg: Register8::A },
+            0xB1 => Instruction::OrAReg8 { reg: Register8::C },
             0xBE => Instruction::CompareIndirectAddr {
                 addr: Register16::HL,
             },
@@ -362,6 +363,10 @@ impl<M: Memory> CPU<M> {
             0xF3 => Instruction::DisableInterrupts,
             0xF5 => Instruction::PushReg16 {
                 reg: Register16::AF,
+            },
+            0xFA => Instruction::ReadMemLit {
+                addr: self.fetch_and_advance_u16(),
+                reg: Register8::A,
             },
             0xFB => Instruction::EnableInterrupts,
             0xFE => Instruction::CompareLit {
@@ -420,6 +425,14 @@ impl<M: Memory> CPU<M> {
                 }
                 MicroOp::LoadReg16Lit { reg, literal } => {
                     self.store_reg16(reg, literal);
+                }
+                MicroOp::OrAReg { reg } => {
+                    self.reg_a |= self.load_reg8(reg);
+                    self.flags = if self.reg_a == 0 {
+                        Flags::ZERO
+                    } else {
+                        Flags::empty()
+                    };
                 }
                 MicroOp::XorAReg { reg } => {
                     self.reg_a ^= self.load_reg8(reg);

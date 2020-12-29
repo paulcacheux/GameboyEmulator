@@ -18,6 +18,9 @@ pub enum Instruction {
         reg: Register16,
         literal: u16,
     },
+    OrAReg8 {
+        reg: Register8,
+    },
     XorAReg8 {
         reg: Register8,
     },
@@ -52,6 +55,10 @@ pub enum Instruction {
         reg: Register8,
         addr: Register16,
         post_op: Option<PrePostOperation>,
+    },
+    ReadMemLit {
+        reg: Register8,
+        addr: u16,
     },
     ReadMemZeroPageLit {
         lit_offset: u8,
@@ -150,6 +157,9 @@ impl fmt::Display for Instruction {
             Instruction::LoadRegLit16bits { reg, literal } => {
                 write!(f, "LD {}, ${:04x}", reg, literal)
             }
+            Instruction::OrAReg8 { reg } => {
+                write!(f, "OR A, {}", reg)
+            }
             Instruction::XorAReg8 { reg } => {
                 write!(f, "XOR A, {}", reg)
             }
@@ -193,6 +203,9 @@ impl fmt::Display for Instruction {
                     write!(f, "LD {}, ({})", reg, addr)
                 }
             },
+            Instruction::ReadMemLit { reg, addr } => {
+                write!(f, "LD {}, (${:04x})", reg, addr)
+            }
             Instruction::ReadMemZeroPageLit { lit_offset, reg } => {
                 write!(f, "LD {}, ($FF00 + ${:02x})", reg, lit_offset)
             }
@@ -213,7 +226,7 @@ impl fmt::Display for Instruction {
                 }
             }
             Instruction::JumpAbsolute { addr } => {
-                write!(f, "JP {:06x}", addr)
+                write!(f, "JP ${:04x}", addr)
             }
             Instruction::IncReg16 { reg } => {
                 write!(f, "INC {}", reg)
@@ -257,6 +270,7 @@ impl Instruction {
                     simpl::load_literal_into_reg8((literal >> 8) as u8, reg.higher_half()),
                 ]
             }
+            Instruction::OrAReg8 { reg } => vec![MicroOp::OrAReg { reg }],
             Instruction::XorAReg8 { reg } => {
                 vec![MicroOp::XorAReg { reg }]
             }
@@ -320,6 +334,14 @@ impl Instruction {
                     source: Move8BitsSource::Address(0xFF00 + lit_offset as u16),
                 },
             ],
+            Instruction::ReadMemLit { reg, addr } => vec![
+                MicroOp::NOP,
+                MicroOp::Move8Bits {
+                    destination: Move8BitsDestination::Register(reg),
+                    source: Move8BitsSource::Address(addr),
+                },
+            ],
+
             Instruction::ReadMem { reg, addr, post_op } => {
                 vec![MicroOp::NOP, MicroOp::ReadMem { reg, addr, post_op }]
             }
