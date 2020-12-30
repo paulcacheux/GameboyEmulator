@@ -138,7 +138,13 @@ pub enum MicroOp {
         reg: Register8,
         set_zero: bool,
     },
-    ShiftRightIntoCarry {
+    ShiftLeftIntoCarry {
+        reg: Register8,
+    },
+    ShiftRightWithZeroIntoCarry {
+        reg: Register8,
+    },
+    ShiftRightWithSignIntoCarry {
         reg: Register8,
     },
     SwapReg8 {

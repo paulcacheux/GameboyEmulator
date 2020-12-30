@@ -214,7 +214,13 @@ pub enum Instruction {
     RotateRight {
         reg: Register8,
     },
-    ShiftRightIntoCarry {
+    ShiftLeftIntoCarry {
+        reg: Register8,
+    },
+    ShiftRightWithZeroIntoCarry {
+        reg: Register8,
+    },
+    ShiftRightWithSignIntoCarry {
         reg: Register8,
     },
     SwapReg8 {
@@ -486,8 +492,14 @@ impl fmt::Display for Instruction {
             Instruction::RotateRight { reg } => {
                 write!(f, "RRC {}", reg)
             }
-            Instruction::ShiftRightIntoCarry { reg } => {
+            Instruction::ShiftLeftIntoCarry { reg } => {
+                write!(f, "SLA {}", reg)
+            }
+            Instruction::ShiftRightWithZeroIntoCarry { reg } => {
                 write!(f, "SRL {}", reg)
+            }
+            Instruction::ShiftRightWithSignIntoCarry { reg } => {
+                write!(f, "SRA {}", reg)
             }
             Instruction::SwapReg8 { reg } => {
                 write!(f, "SWAP {}", reg)
@@ -975,8 +987,14 @@ impl Instruction {
                     },
                 ]
             }
-            Instruction::ShiftRightIntoCarry { reg } => {
-                vec![MicroOp::NOP, MicroOp::ShiftRightIntoCarry { reg }]
+            Instruction::ShiftLeftIntoCarry { reg } => {
+                vec![MicroOp::NOP, MicroOp::ShiftLeftIntoCarry { reg }]
+            }
+            Instruction::ShiftRightWithZeroIntoCarry { reg } => {
+                vec![MicroOp::NOP, MicroOp::ShiftRightWithZeroIntoCarry { reg }]
+            }
+            Instruction::ShiftRightWithSignIntoCarry { reg } => {
+                vec![MicroOp::NOP, MicroOp::ShiftRightWithSignIntoCarry { reg }]
             }
             Instruction::SwapReg8 { reg } => {
                 vec![MicroOp::NOP, MicroOp::SwapReg8 { reg }]

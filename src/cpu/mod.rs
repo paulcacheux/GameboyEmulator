@@ -745,8 +745,38 @@ impl<M: Memory> CPU<M> {
                     0x1D => Instruction::RotateRightThroughCarry { reg: Register8::L },
                     0x1F => Instruction::RotateRightThroughCarry { reg: Register8::A },
 
+                    0x20 => Instruction::ShiftLeftIntoCarry { reg: Register8::B },
+                    0x21 => Instruction::ShiftLeftIntoCarry { reg: Register8::C },
+                    0x22 => Instruction::ShiftLeftIntoCarry { reg: Register8::D },
+                    0x23 => Instruction::ShiftLeftIntoCarry { reg: Register8::E },
+                    0x24 => Instruction::ShiftLeftIntoCarry { reg: Register8::H },
+                    0x25 => Instruction::ShiftLeftIntoCarry { reg: Register8::L },
+                    0x27 => Instruction::ShiftLeftIntoCarry { reg: Register8::A },
+
+                    0x28 => Instruction::ShiftRightWithSignIntoCarry { reg: Register8::B },
+                    0x29 => Instruction::ShiftRightWithSignIntoCarry { reg: Register8::C },
+                    0x2A => Instruction::ShiftRightWithSignIntoCarry { reg: Register8::D },
+                    0x2B => Instruction::ShiftRightWithSignIntoCarry { reg: Register8::E },
+                    0x2C => Instruction::ShiftRightWithSignIntoCarry { reg: Register8::H },
+                    0x2D => Instruction::ShiftRightWithSignIntoCarry { reg: Register8::L },
+                    0x2F => Instruction::ShiftRightWithSignIntoCarry { reg: Register8::A },
+
+                    0x30 => Instruction::SwapReg8 { reg: Register8::B },
+                    0x31 => Instruction::SwapReg8 { reg: Register8::C },
+                    0x32 => Instruction::SwapReg8 { reg: Register8::D },
+                    0x33 => Instruction::SwapReg8 { reg: Register8::E },
+                    0x34 => Instruction::SwapReg8 { reg: Register8::H },
+                    0x35 => Instruction::SwapReg8 { reg: Register8::L },
                     0x37 => Instruction::SwapReg8 { reg: Register8::A },
-                    0x38 => Instruction::ShiftRightIntoCarry { reg: Register8::B },
+
+                    0x38 => Instruction::ShiftRightWithZeroIntoCarry { reg: Register8::B },
+                    0x39 => Instruction::ShiftRightWithZeroIntoCarry { reg: Register8::C },
+                    0x3A => Instruction::ShiftRightWithZeroIntoCarry { reg: Register8::D },
+                    0x3B => Instruction::ShiftRightWithZeroIntoCarry { reg: Register8::E },
+                    0x3C => Instruction::ShiftRightWithZeroIntoCarry { reg: Register8::H },
+                    0x3D => Instruction::ShiftRightWithZeroIntoCarry { reg: Register8::L },
+                    0x3F => Instruction::ShiftRightWithZeroIntoCarry { reg: Register8::A },
+
                     0x7C => Instruction::BitTest {
                         reg: Register8::H,
                         bit: 7,
@@ -1254,12 +1284,40 @@ impl<M: Memory> CPU<M> {
                         self.flags |= Flags::ZERO;
                     }
                 }
-                MicroOp::ShiftRightIntoCarry { reg } => {
+                MicroOp::ShiftLeftIntoCarry { reg } => {
+                    let value = self.load_reg8(reg);
+                    let carry = (value >> 7) == 1;
+                    let new_value = value << 1;
+                    self.store_reg8(reg, new_value);
+
+                    self.flags = Flags::empty();
+                    if carry {
+                        self.flags |= Flags::CARRY;
+                    }
+                    if new_value == 0 {
+                        self.flags |= Flags::ZERO;
+                    }
+                }
+                MicroOp::ShiftRightWithZeroIntoCarry { reg } => {
                     let value = self.load_reg8(reg);
                     let carry = (value & 0x1) == 1;
                     let new_value = value >> 1;
-
                     self.store_reg8(reg, new_value);
+
+                    self.flags = Flags::empty();
+                    if carry {
+                        self.flags |= Flags::CARRY;
+                    }
+                    if new_value == 0 {
+                        self.flags |= Flags::ZERO;
+                    }
+                }
+                MicroOp::ShiftRightWithSignIntoCarry { reg } => {
+                    let value = self.load_reg8(reg);
+                    let carry = (value & 0x1) == 1;
+                    let new_value = ((value as i8) >> 1) as u8;
+                    self.store_reg8(reg, new_value);
+
                     self.flags = Flags::empty();
                     if carry {
                         self.flags |= Flags::CARRY;
