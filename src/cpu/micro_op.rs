@@ -97,6 +97,9 @@ pub enum MicroOp {
     IncReg {
         reg: Register8,
     },
+    IncIndirect {
+        addr: Register16,
+    },
     DecReg16 {
         reg: Register16,
     },
@@ -128,6 +131,8 @@ pub enum MicroOp {
         true_ops: Vec<MicroOp>,
         false_ops: Vec<MicroOp>,
     },
+    SetCarryFlag,
+    ComplementCarryFlag,
     EnableInterrupts,
     DisableInterrupts,
 }

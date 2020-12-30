@@ -158,6 +158,11 @@ impl<M: Memory> CPU<M> {
                 reg: Register16::BC,
                 literal: self.fetch_and_advance_u16(),
             },
+            0x02 => Instruction::WriteReg8ValueAtIndirect {
+                reg: Register8::A,
+                addr: Register16::BC,
+                post_op: None,
+            },
             0x03 => Instruction::IncReg16 {
                 reg: Register16::BC,
             },
@@ -173,6 +178,11 @@ impl<M: Memory> CPU<M> {
             },
             0x09 => Instruction::AddHLWithReg {
                 reg: Register16::BC,
+            },
+            0x0A => Instruction::ReadIndirectToReg8 {
+                addr: Register16::BC,
+                reg: Register8::A,
+                post_op: None,
             },
             0x0B => Instruction::DecReg16 {
                 reg: Register16::BC,
@@ -251,6 +261,9 @@ impl<M: Memory> CPU<M> {
                 condition: Some(JumpCondition::Zero),
                 offset: self.fetch_and_advance() as i8,
             },
+            0x29 => Instruction::AddHLWithReg {
+                reg: Register16::HL,
+            },
             0x2A => Instruction::ReadIndirectToReg8 {
                 reg: Register8::A,
                 addr: Register16::HL,
@@ -266,9 +279,6 @@ impl<M: Memory> CPU<M> {
                 literal: self.fetch_and_advance(),
             },
             0x2F => Instruction::ComplementA,
-            0x29 => Instruction::AddHLWithReg {
-                reg: Register16::HL,
-            },
             0x30 => Instruction::JumpRelative {
                 condition: Some(JumpCondition::NonCarry),
                 offset: self.fetch_and_advance() as i8,
@@ -285,6 +295,9 @@ impl<M: Memory> CPU<M> {
             0x33 => Instruction::IncReg16 {
                 reg: Register16::SP,
             },
+            0x34 => Instruction::IncIndirect {
+                addr: Register16::HL,
+            },
             0x35 => Instruction::DecIndirect {
                 addr: Register16::HL,
             },
@@ -292,12 +305,18 @@ impl<M: Memory> CPU<M> {
                 addr: Register16::HL,
                 literal: self.fetch_and_advance(),
             },
+            0x37 => Instruction::SetCarryFlag,
             0x38 => Instruction::JumpRelative {
                 condition: Some(JumpCondition::Carry),
                 offset: self.fetch_and_advance() as i8,
             },
             0x39 => Instruction::AddHLWithReg {
                 reg: Register16::SP,
+            },
+            0x3A => Instruction::ReadIndirectToReg8 {
+                addr: Register16::HL,
+                reg: Register8::A,
+                post_op: Some(PrePostOperation::Dec),
             },
             0x3B => Instruction::DecReg16 {
                 reg: Register16::SP,
@@ -308,6 +327,31 @@ impl<M: Memory> CPU<M> {
                 reg: Register8::A,
                 literal: self.fetch_and_advance(),
             },
+            0x3F => Instruction::ComplementCarryFlag,
+            0x40 => Instruction::Move {
+                dest: Register8::B,
+                src: Register8::B,
+            },
+            0x41 => Instruction::Move {
+                dest: Register8::B,
+                src: Register8::C,
+            },
+            0x42 => Instruction::Move {
+                dest: Register8::B,
+                src: Register8::D,
+            },
+            0x43 => Instruction::Move {
+                dest: Register8::B,
+                src: Register8::E,
+            },
+            0x44 => Instruction::Move {
+                dest: Register8::B,
+                src: Register8::H,
+            },
+            0x45 => Instruction::Move {
+                dest: Register8::B,
+                src: Register8::L,
+            },
             0x46 => Instruction::ReadIndirectToReg8 {
                 reg: Register8::B,
                 addr: Register16::HL,
@@ -316,6 +360,30 @@ impl<M: Memory> CPU<M> {
             0x47 => Instruction::Move {
                 dest: Register8::B,
                 src: Register8::A,
+            },
+            0x48 => Instruction::Move {
+                dest: Register8::C,
+                src: Register8::B,
+            },
+            0x49 => Instruction::Move {
+                dest: Register8::C,
+                src: Register8::C,
+            },
+            0x4A => Instruction::Move {
+                dest: Register8::C,
+                src: Register8::D,
+            },
+            0x4B => Instruction::Move {
+                dest: Register8::C,
+                src: Register8::E,
+            },
+            0x4C => Instruction::Move {
+                dest: Register8::C,
+                src: Register8::H,
+            },
+            0x4D => Instruction::Move {
+                dest: Register8::C,
+                src: Register8::L,
             },
             0x4E => Instruction::ReadIndirectToReg8 {
                 reg: Register8::C,
@@ -326,6 +394,30 @@ impl<M: Memory> CPU<M> {
                 dest: Register8::C,
                 src: Register8::A,
             },
+            0x50 => Instruction::Move {
+                dest: Register8::D,
+                src: Register8::B,
+            },
+            0x51 => Instruction::Move {
+                dest: Register8::D,
+                src: Register8::C,
+            },
+            0x52 => Instruction::Move {
+                dest: Register8::D,
+                src: Register8::D,
+            },
+            0x53 => Instruction::Move {
+                dest: Register8::D,
+                src: Register8::E,
+            },
+            0x54 => Instruction::Move {
+                dest: Register8::D,
+                src: Register8::H,
+            },
+            0x55 => Instruction::Move {
+                dest: Register8::D,
+                src: Register8::L,
+            },
             0x56 => Instruction::ReadIndirectToReg8 {
                 reg: Register8::D,
                 addr: Register16::HL,
@@ -334,6 +426,26 @@ impl<M: Memory> CPU<M> {
             0x57 => Instruction::Move {
                 dest: Register8::D,
                 src: Register8::A,
+            },
+            0x58 => Instruction::Move {
+                dest: Register8::E,
+                src: Register8::B,
+            },
+            0x59 => Instruction::Move {
+                dest: Register8::E,
+                src: Register8::C,
+            },
+            0x5A => Instruction::Move {
+                dest: Register8::E,
+                src: Register8::D,
+            },
+            0x5B => Instruction::Move {
+                dest: Register8::E,
+                src: Register8::E,
+            },
+            0x5C => Instruction::Move {
+                dest: Register8::E,
+                src: Register8::H,
             },
             0x5D => Instruction::Move {
                 dest: Register8::E,
@@ -478,10 +590,45 @@ impl<M: Memory> CPU<M> {
                 addr: Register16::HL,
                 post_op: None,
             },
+            0x7F => Instruction::Move {
+                dest: Register8::A,
+                src: Register8::A,
+            },
+            0x80 => Instruction::AddAWithReg8 { reg: Register8::B },
+            0x81 => Instruction::AddAWithReg8 { reg: Register8::C },
+            0x82 => Instruction::AddAWithReg8 { reg: Register8::D },
+            0x83 => Instruction::AddAWithReg8 { reg: Register8::E },
+            0x84 => Instruction::AddAWithReg8 { reg: Register8::H },
+            0x85 => Instruction::AddAWithReg8 { reg: Register8::L },
             0x86 => Instruction::AddAWithIndirect {
                 addr: Register16::HL,
             },
+            0x87 => Instruction::AddAWithReg8 { reg: Register8::A },
+            0x88 => Instruction::AdcAWithReg8 { reg: Register8::B },
+            0x89 => Instruction::AdcAWithReg8 { reg: Register8::C },
+            0x8A => Instruction::AdcAWithReg8 { reg: Register8::D },
+            0x8B => Instruction::AdcAWithReg8 { reg: Register8::E },
+            0x8C => Instruction::AdcAWithReg8 { reg: Register8::H },
+            0x8D => Instruction::AdcAWithReg8 { reg: Register8::L },
+            0x8E => Instruction::AdcAWithIndirect {
+                addr: Register16::HL,
+            },
+            0x8F => Instruction::AdcAWithReg8 { reg: Register8::A },
             0x90 => Instruction::SubAWithReg8 { reg: Register8::B },
+            0x91 => Instruction::SubAWithReg8 { reg: Register8::C },
+            0x92 => Instruction::SubAWithReg8 { reg: Register8::D },
+            0x93 => Instruction::SubAWithReg8 { reg: Register8::E },
+            0x94 => Instruction::SubAWithReg8 { reg: Register8::H },
+            0x95 => Instruction::SubAWithReg8 { reg: Register8::L },
+
+            0xA0 => Instruction::AndAWithReg8 { reg: Register8::B },
+            0xA1 => Instruction::AndAWithReg8 { reg: Register8::C },
+            0xA2 => Instruction::AndAWithReg8 { reg: Register8::D },
+            0xA3 => Instruction::AndAWithReg8 { reg: Register8::E },
+            0xA4 => Instruction::AndAWithReg8 { reg: Register8::H },
+            0xA5 => Instruction::AndAWithReg8 { reg: Register8::L },
+
+            0xA7 => Instruction::AndAWithReg8 { reg: Register8::A },
             0xA8 => Instruction::XorAWithReg8 { reg: Register8::B },
             0xA9 => Instruction::XorAWithReg8 { reg: Register8::C },
             0xAA => Instruction::XorAWithReg8 { reg: Register8::D },
@@ -498,10 +645,6 @@ impl<M: Memory> CPU<M> {
             0xB3 => Instruction::OrAWithReg8 { reg: Register8::E },
             0xB4 => Instruction::OrAWithReg8 { reg: Register8::H },
             0xB5 => Instruction::OrAWithReg8 { reg: Register8::L },
-            0xBB => Instruction::CompareAWithReg { reg: Register8::E },
-            0xBE => Instruction::CompareAWithIndirect {
-                addr: Register16::HL,
-            },
             0xB6 => Instruction::OrAWithIndirect {
                 addr: Register16::HL,
             },
@@ -509,6 +652,16 @@ impl<M: Memory> CPU<M> {
             0xB8 => Instruction::CompareAWithReg { reg: Register8::B },
             0xB9 => Instruction::CompareAWithReg { reg: Register8::C },
             0xBA => Instruction::CompareAWithReg { reg: Register8::D },
+            0xBB => Instruction::CompareAWithReg { reg: Register8::E },
+            0xBC => Instruction::CompareAWithReg { reg: Register8::H },
+            0xBD => Instruction::CompareAWithReg { reg: Register8::L },
+            0xBE => Instruction::CompareAWithIndirect {
+                addr: Register16::HL,
+            },
+            0xBF => Instruction::CompareAWithReg { reg: Register8::A },
+            0xC0 => Instruction::Return {
+                condition: Some(JumpCondition::NonZero),
+            },
             0xC1 => Instruction::PopReg16 {
                 reg: Register16::BC,
             },
@@ -534,6 +687,10 @@ impl<M: Memory> CPU<M> {
                 condition: Some(JumpCondition::Zero),
             },
             0xC9 => Instruction::Return { condition: None },
+            0xCA => Instruction::JumpAbsolute {
+                condition: Some(JumpCondition::Zero),
+                addr: self.fetch_and_advance_u16(),
+            },
             0xCB => {
                 // prefix 0xCB:
                 match self.fetch_and_advance() {
@@ -553,6 +710,10 @@ impl<M: Memory> CPU<M> {
                     other => panic!("Unknown sub-opcode (prefix 0xCB) {:#x}", other),
                 }
             }
+            0xCC => Instruction::CallAddr {
+                condition: Some(JumpCondition::Zero),
+                addr: self.fetch_and_advance_u16(),
+            },
             0xCD => Instruction::CallAddr {
                 condition: None,
                 addr: self.fetch_and_advance_u16(),
@@ -566,6 +727,15 @@ impl<M: Memory> CPU<M> {
             0xD1 => Instruction::PopReg16 {
                 reg: Register16::DE,
             },
+            0xD2 => Instruction::JumpAbsolute {
+                condition: Some(JumpCondition::NonCarry),
+                addr: self.fetch_and_advance_u16(),
+            },
+            // 0xD3 => nothing
+            0xD4 => Instruction::CallAddr {
+                condition: Some(JumpCondition::NonCarry),
+                addr: self.fetch_and_advance_u16(),
+            },
             0xD5 => Instruction::PushReg16 {
                 reg: Register16::DE,
             },
@@ -575,6 +745,16 @@ impl<M: Memory> CPU<M> {
             0xD8 => Instruction::Return {
                 condition: Some(JumpCondition::Carry),
             },
+            0xDA => Instruction::JumpAbsolute {
+                condition: Some(JumpCondition::Carry),
+                addr: self.fetch_and_advance_u16(),
+            },
+            // 0xDB => nothing
+            0xDC => Instruction::CallAddr {
+                condition: Some(JumpCondition::Carry),
+                addr: self.fetch_and_advance_u16(),
+            },
+            // 0xDD => nothing
             0xE0 => Instruction::WriteReg8ValueAtZeroPageOffsetLiteral {
                 lit_offset: self.fetch_and_advance(),
                 reg: Register8::A,
@@ -586,6 +766,8 @@ impl<M: Memory> CPU<M> {
                 reg_offset: Register8::C,
                 reg: Register8::A,
             },
+            // 0xE3 => nothing
+            // 0xE4 => nothing
             0xE5 => Instruction::PushReg16 {
                 reg: Register16::HL,
             },
@@ -603,6 +785,9 @@ impl<M: Memory> CPU<M> {
                 addr: self.fetch_and_advance_u16(),
                 reg: Register8::A,
             },
+            // 0xEB => nothing
+            // 0xEC => nothing
+            // 0xED => nothing
             0xEE => Instruction::XorAWithLiteral {
                 literal: self.fetch_and_advance(),
             },
@@ -614,8 +799,12 @@ impl<M: Memory> CPU<M> {
                 reg: Register16::AF,
             },
             0xF3 => Instruction::DisableInterrupts,
+            // 0xF4 => nothing
             0xF5 => Instruction::PushReg16 {
                 reg: Register16::AF,
+            },
+            0xF6 => Instruction::OrAWithLiteral {
+                literal: self.fetch_and_advance(),
             },
             0xF8 => Instruction::LoadAddressOffsetIntoReg16 {
                 dest: Register16::HL,
@@ -631,6 +820,8 @@ impl<M: Memory> CPU<M> {
                 reg: Register8::A,
             },
             0xFB => Instruction::EnableInterrupts,
+            // 0xFC => nothing
+            // 0xFD => nothing
             0xFE => Instruction::CompareAWithLiteral {
                 literal: self.fetch_and_advance(),
             },
@@ -908,6 +1099,20 @@ impl<M: Memory> CPU<M> {
                     flags |= self.flags & Flags::CARRY;
                     self.flags = flags;
                 }
+                MicroOp::IncIndirect { addr } => {
+                    let addr = self.load_reg16(addr);
+                    let start_value = self.memory.read_memory(addr);
+                    let half_carry = check_half_carry(start_value, 1);
+                    let new_value = start_value.wrapping_add(1);
+                    self.memory.write_memory(addr, new_value);
+
+                    self.update_flags_arith(
+                        new_value,
+                        false,
+                        self.flags.contains(Flags::CARRY),
+                        half_carry,
+                    );
+                }
                 MicroOp::DecReg16 { reg } => {
                     // No flags change for this micro op
                     self.store_reg16(reg, self.load_reg16(reg).wrapping_sub(1));
@@ -995,6 +1200,13 @@ impl<M: Memory> CPU<M> {
                     if res == 0 {
                         self.flags |= Flags::ZERO;
                     }
+                }
+                MicroOp::SetCarryFlag => {
+                    self.flags = (self.flags & Flags::ZERO) | Flags::CARRY;
+                }
+                MicroOp::ComplementCarryFlag => {
+                    self.flags.remove(Flags::NEGATIVE | Flags::HALF_CARRY);
+                    self.flags.toggle(Flags::CARRY);
                 }
                 MicroOp::EnableInterrupts => {
                     info!("Enable interrupts")

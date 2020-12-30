@@ -39,6 +39,9 @@ pub enum Instruction {
     OrAWithIndirect {
         addr: Register16,
     },
+    OrAWithLiteral {
+        literal: u8,
+    },
     XorAWithReg8 {
         reg: Register8,
     },
@@ -47,6 +50,9 @@ pub enum Instruction {
     },
     XorAWithLiteral {
         literal: u8,
+    },
+    AddAWithReg8 {
+        reg: Register8,
     },
     AddAWithLiteral {
         literal: u8,
@@ -61,8 +67,14 @@ pub enum Instruction {
         reg: Register16,
         offset: i8,
     },
+    AdcAWithReg8 {
+        reg: Register8,
+    },
     AdcAWithLiteral {
         literal: u8,
+    },
+    AdcAWithIndirect {
+        addr: Register16,
     },
     SubAWithReg8 {
         reg: Register8,
@@ -144,6 +156,9 @@ pub enum Instruction {
     IncReg8 {
         reg: Register8,
     },
+    IncIndirect {
+        addr: Register16,
+    },
     DecReg16 {
         reg: Register16,
     },
@@ -177,6 +192,8 @@ pub enum Instruction {
     SwapReg8 {
         reg: Register8,
     },
+    SetCarryFlag,
+    ComplementCarryFlag,
     EnableInterrupts,
     DisableInterrupts,
 }
@@ -247,6 +264,9 @@ impl fmt::Display for Instruction {
             Instruction::OrAWithIndirect { addr } => {
                 write!(f, "OR A, ({})", addr)
             }
+            Instruction::OrAWithLiteral { literal } => {
+                write!(f, "OR A, ${:02x}", literal)
+            }
             Instruction::XorAWithReg8 { reg } => {
                 write!(f, "XOR A, {}", reg)
             }
@@ -255,6 +275,9 @@ impl fmt::Display for Instruction {
             }
             Instruction::XorAWithLiteral { literal } => {
                 write!(f, "XOR A, ${:02x}", literal)
+            }
+            Instruction::AddAWithReg8 { reg } => {
+                write!(f, "ADD A, {}", reg)
             }
             Instruction::AddAWithIndirect { addr } => {
                 write!(f, "ADD A, ({})", addr)
@@ -268,8 +291,14 @@ impl fmt::Display for Instruction {
             Instruction::AddOffsetToReg16 { reg, offset } => {
                 write!(f, "ADD {}, {}", reg, offset) // check format for offset
             }
+            Instruction::AdcAWithReg8 { reg } => {
+                write!(f, "ADC A, {}", reg)
+            }
             Instruction::AdcAWithLiteral { literal } => {
                 write!(f, "ADC A, ${:02x}", literal)
+            }
+            Instruction::AdcAWithIndirect { addr } => {
+                write!(f, "ADC A, ({})", addr)
             }
             Instruction::SubAWithReg8 { reg } => {
                 write!(f, "SUB A, {}", reg)
@@ -366,6 +395,9 @@ impl fmt::Display for Instruction {
             Instruction::IncReg8 { reg } => {
                 write!(f, "INC {}", reg)
             }
+            Instruction::IncIndirect { addr } => {
+                write!(f, "INC ({})", addr)
+            }
             Instruction::DecReg16 { reg } => {
                 write!(f, "DEC {}", reg)
             }
@@ -402,6 +434,8 @@ impl fmt::Display for Instruction {
             Instruction::SwapReg8 { reg } => {
                 write!(f, "SWAP {}", reg)
             }
+            Instruction::SetCarryFlag => write!(f, "SCF"),
+            Instruction::ComplementCarryFlag => write!(f, "CCF"),
             Instruction::EnableInterrupts => write!(f, "EI"),
             Instruction::DisableInterrupts => write!(f, "DI"),
         }
@@ -460,6 +494,12 @@ impl Instruction {
                     rhs: Source8bits::Indirect(addr),
                 },
             ],
+            Instruction::OrAWithLiteral { literal } => vec![
+                MicroOp::NOP,
+                MicroOp::OrA {
+                    rhs: literal.into(),
+                },
+            ],
             Instruction::XorAWithReg8 { reg } => {
                 vec![MicroOp::XorA { rhs: reg.into() }]
             }
@@ -479,6 +519,7 @@ impl Instruction {
                     },
                 ]
             }
+            Instruction::AddAWithReg8 { reg } => vec![MicroOp::AddA { rhs: reg.into() }],
             Instruction::AddAWithIndirect { addr } => {
                 vec![
                     MicroOp::NOP,
@@ -511,11 +552,22 @@ impl Instruction {
                     },
                 ]
             }
+            Instruction::AdcAWithReg8 { reg } => {
+                vec![MicroOp::AdcA { rhs: reg.into() }]
+            }
             Instruction::AdcAWithLiteral { literal } => {
                 vec![
                     MicroOp::NOP,
                     MicroOp::AdcA {
                         rhs: literal.into(),
+                    },
+                ]
+            }
+            Instruction::AdcAWithIndirect { addr } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::AdcA {
+                        rhs: Source8bits::Indirect(addr),
                     },
                 ]
             }
@@ -779,6 +831,9 @@ impl Instruction {
             }],
             Instruction::IncReg16 { reg } => vec![MicroOp::NOP, MicroOp::IncReg16 { reg }],
             Instruction::IncReg8 { reg } => vec![MicroOp::IncReg { reg }],
+            Instruction::IncIndirect { addr } => {
+                vec![MicroOp::NOP, MicroOp::NOP, MicroOp::IncIndirect { addr }]
+            }
             Instruction::DecReg16 { reg } => vec![MicroOp::NOP, MicroOp::DecReg16 { reg }],
             Instruction::DecReg8 { reg } => vec![MicroOp::DecReg { reg }],
             Instruction::DecIndirect { addr } => {
@@ -833,6 +888,8 @@ impl Instruction {
             Instruction::SwapReg8 { reg } => {
                 vec![MicroOp::NOP, MicroOp::SwapReg8 { reg }]
             }
+            Instruction::SetCarryFlag => vec![MicroOp::SetCarryFlag],
+            Instruction::ComplementCarryFlag => vec![MicroOp::ComplementCarryFlag],
             Instruction::EnableInterrupts => vec![MicroOp::EnableInterrupts],
             Instruction::DisableInterrupts => vec![MicroOp::DisableInterrupts],
         }
