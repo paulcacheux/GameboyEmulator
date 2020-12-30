@@ -778,10 +778,238 @@ impl<M: Memory> CPU<M> {
                     0x3D => Instruction::ShiftRightWithZeroIntoCarry { reg: Register8::L },
                     0x3F => Instruction::ShiftRightWithZeroIntoCarry { reg: Register8::A },
 
+                    0x40 => Instruction::BitTest {
+                        reg: Register8::B,
+                        bit: 0,
+                    },
+                    0x41 => Instruction::BitTest {
+                        reg: Register8::C,
+                        bit: 0,
+                    },
+                    0x42 => Instruction::BitTest {
+                        reg: Register8::D,
+                        bit: 0,
+                    },
+                    0x43 => Instruction::BitTest {
+                        reg: Register8::E,
+                        bit: 0,
+                    },
+                    0x44 => Instruction::BitTest {
+                        reg: Register8::H,
+                        bit: 0,
+                    },
+                    0x45 => Instruction::BitTest {
+                        reg: Register8::L,
+                        bit: 0,
+                    },
+                    0x47 => Instruction::BitTest {
+                        reg: Register8::A,
+                        bit: 0,
+                    },
+
+                    0x48 => Instruction::BitTest {
+                        reg: Register8::B,
+                        bit: 1,
+                    },
+                    0x49 => Instruction::BitTest {
+                        reg: Register8::C,
+                        bit: 1,
+                    },
+                    0x4A => Instruction::BitTest {
+                        reg: Register8::D,
+                        bit: 1,
+                    },
+                    0x4B => Instruction::BitTest {
+                        reg: Register8::E,
+                        bit: 1,
+                    },
+                    0x4C => Instruction::BitTest {
+                        reg: Register8::H,
+                        bit: 1,
+                    },
+                    0x4D => Instruction::BitTest {
+                        reg: Register8::L,
+                        bit: 1,
+                    },
+                    0x4F => Instruction::BitTest {
+                        reg: Register8::A,
+                        bit: 1,
+                    },
+
+                    0x50 => Instruction::BitTest {
+                        reg: Register8::B,
+                        bit: 2,
+                    },
+                    0x51 => Instruction::BitTest {
+                        reg: Register8::C,
+                        bit: 2,
+                    },
+                    0x52 => Instruction::BitTest {
+                        reg: Register8::D,
+                        bit: 2,
+                    },
+                    0x53 => Instruction::BitTest {
+                        reg: Register8::E,
+                        bit: 2,
+                    },
+                    0x54 => Instruction::BitTest {
+                        reg: Register8::H,
+                        bit: 2,
+                    },
+                    0x55 => Instruction::BitTest {
+                        reg: Register8::L,
+                        bit: 2,
+                    },
+                    0x57 => Instruction::BitTest {
+                        reg: Register8::A,
+                        bit: 2,
+                    },
+
+                    0x58 => Instruction::BitTest {
+                        reg: Register8::B,
+                        bit: 3,
+                    },
+                    0x59 => Instruction::BitTest {
+                        reg: Register8::C,
+                        bit: 3,
+                    },
+                    0x5A => Instruction::BitTest {
+                        reg: Register8::D,
+                        bit: 3,
+                    },
+                    0x5B => Instruction::BitTest {
+                        reg: Register8::E,
+                        bit: 3,
+                    },
+                    0x5C => Instruction::BitTest {
+                        reg: Register8::H,
+                        bit: 3,
+                    },
+                    0x5D => Instruction::BitTest {
+                        reg: Register8::L,
+                        bit: 3,
+                    },
+                    0x5F => Instruction::BitTest {
+                        reg: Register8::A,
+                        bit: 3,
+                    },
+
+                    0x60 => Instruction::BitTest {
+                        reg: Register8::B,
+                        bit: 4,
+                    },
+                    0x61 => Instruction::BitTest {
+                        reg: Register8::C,
+                        bit: 4,
+                    },
+                    0x62 => Instruction::BitTest {
+                        reg: Register8::D,
+                        bit: 4,
+                    },
+                    0x63 => Instruction::BitTest {
+                        reg: Register8::E,
+                        bit: 4,
+                    },
+                    0x64 => Instruction::BitTest {
+                        reg: Register8::H,
+                        bit: 4,
+                    },
+                    0x65 => Instruction::BitTest {
+                        reg: Register8::L,
+                        bit: 4,
+                    },
+                    0x67 => Instruction::BitTest {
+                        reg: Register8::A,
+                        bit: 4,
+                    },
+
+                    0x68 => Instruction::BitTest {
+                        reg: Register8::B,
+                        bit: 5,
+                    },
+                    0x69 => Instruction::BitTest {
+                        reg: Register8::C,
+                        bit: 5,
+                    },
+                    0x6A => Instruction::BitTest {
+                        reg: Register8::D,
+                        bit: 5,
+                    },
+                    0x6B => Instruction::BitTest {
+                        reg: Register8::E,
+                        bit: 5,
+                    },
+                    0x6C => Instruction::BitTest {
+                        reg: Register8::H,
+                        bit: 5,
+                    },
+                    0x6D => Instruction::BitTest {
+                        reg: Register8::L,
+                        bit: 5,
+                    },
+                    0x6F => Instruction::BitTest {
+                        reg: Register8::A,
+                        bit: 5,
+                    },
+
+                    0x70 => Instruction::BitTest {
+                        reg: Register8::B,
+                        bit: 6,
+                    },
+                    0x71 => Instruction::BitTest {
+                        reg: Register8::C,
+                        bit: 6,
+                    },
+                    0x72 => Instruction::BitTest {
+                        reg: Register8::D,
+                        bit: 6,
+                    },
+                    0x73 => Instruction::BitTest {
+                        reg: Register8::E,
+                        bit: 6,
+                    },
+                    0x74 => Instruction::BitTest {
+                        reg: Register8::H,
+                        bit: 6,
+                    },
+                    0x75 => Instruction::BitTest {
+                        reg: Register8::L,
+                        bit: 6,
+                    },
+                    0x77 => Instruction::BitTest {
+                        reg: Register8::A,
+                        bit: 6,
+                    },
+
+                    0x78 => Instruction::BitTest {
+                        reg: Register8::B,
+                        bit: 7,
+                    },
+                    0x79 => Instruction::BitTest {
+                        reg: Register8::C,
+                        bit: 7,
+                    },
+                    0x7A => Instruction::BitTest {
+                        reg: Register8::D,
+                        bit: 7,
+                    },
+                    0x7B => Instruction::BitTest {
+                        reg: Register8::E,
+                        bit: 7,
+                    },
                     0x7C => Instruction::BitTest {
                         reg: Register8::H,
                         bit: 7,
                     },
+                    0x7D => Instruction::BitTest {
+                        reg: Register8::L,
+                        bit: 7,
+                    },
+                    0x7F => Instruction::BitTest {
+                        reg: Register8::A,
+                        bit: 7,
+                    },
+
                     other => panic!("Unknown sub-opcode (prefix 0xCB) {:#x}", other),
                 }
             }
