@@ -1,5 +1,7 @@
 use std::{rc::Rc, sync::RwLock};
 
+use log::debug;
+
 #[derive(Debug, Clone)]
 pub struct MMU {
     bootstrap_rom: Box<[u8; 0x8000]>,
@@ -67,7 +69,10 @@ impl Memory for MMU {
             0xC000..=0xDFFF => self.wram[addr as usize - 0xC000],
             0xE000..=0xFDFF => self.wram[addr as usize - 0xE000],
             0xFE00..=0xFE9F => self.oam[addr as usize - 0xFE00],
-            0xFEA0..=0xFEFF => panic!("Unusable space"),
+            0xFEA0..=0xFEFF => {
+                debug!("Unusable space {:#x}", addr);
+                0xFF
+            }
             0xFF00..=0xFF7F => self.io_regs[addr as usize - 0xFF00],
             0xFF80..=0xFFFE => self.hram[addr as usize - 0xFF80],
             0xFFFF => self.ie_reg,
@@ -88,7 +93,9 @@ impl Memory for MMU {
             0xC000..=0xDFFF => self.wram[addr as usize - 0xC000] = value,
             0xE000..=0xFDFF => self.wram[addr as usize - 0xE000] = value,
             0xFE00..=0xFE9F => self.oam[addr as usize - 0xFE00] = value,
-            0xFEA0..=0xFEFF => panic!("Unusable space"),
+            0xFEA0..=0xFEFF => {
+                debug!("Write to unusable space {:#x}", addr)
+            }
             0xFF00..=0xFF7F => self.io_regs[addr as usize - 0xFF00] = value,
             0xFF80..=0xFFFE => self.hram[addr as usize - 0xFF80] = value,
             0xFFFF => self.ie_reg = value,
