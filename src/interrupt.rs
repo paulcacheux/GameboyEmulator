@@ -1,7 +1,6 @@
 use std::{rc::Rc, sync::Mutex};
 
 use bitflags::bitflags;
-use log::warn;
 
 pub type InterruptControllerPtr = Rc<Mutex<InterruptController>>;
 
@@ -111,7 +110,7 @@ impl InterruptController {
             return None;
         }
 
-        let acceptables = self.interrupt_flag & self.interrupt_enable & !IntKind::DUMMY;
+        let requested = self.interrupt_flag & self.interrupt_enable & !IntKind::DUMMY;
         for &kind in &[
             IntKind::VBLANK,
             IntKind::LCD_STAT,
@@ -119,7 +118,7 @@ impl InterruptController {
             IntKind::SERIAL,
             IntKind::JOYPAD,
         ] {
-            if acceptables.contains(kind) {
+            if requested.contains(kind) {
                 return Some(kind);
             }
         }
