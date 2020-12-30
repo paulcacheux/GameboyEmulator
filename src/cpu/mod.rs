@@ -267,6 +267,9 @@ impl<M: Memory> CPU<M> {
                 reg: Register8::A,
                 post_op: Some(PrePostOperation::Dec),
             },
+            0x33 => Instruction::IncReg16 {
+                reg: Register16::SP,
+            },
             0x35 => Instruction::DecIndirect {
                 addr: Register16::HL,
             },
@@ -324,6 +327,30 @@ impl<M: Memory> CPU<M> {
                 dest: Register8::E,
                 src: Register8::A,
             },
+            0x60 => Instruction::Move {
+                dest: Register8::H,
+                src: Register8::B,
+            },
+            0x61 => Instruction::Move {
+                dest: Register8::H,
+                src: Register8::C,
+            },
+            0x62 => Instruction::Move {
+                dest: Register8::H,
+                src: Register8::D,
+            },
+            0x63 => Instruction::Move {
+                dest: Register8::H,
+                src: Register8::E,
+            },
+            0x64 => Instruction::Move {
+                dest: Register8::H,
+                src: Register8::H,
+            },
+            0x65 => Instruction::Move {
+                dest: Register8::H,
+                src: Register8::L,
+            },
             0x66 => Instruction::ReadIndirectToReg8 {
                 addr: Register16::HL,
                 reg: Register8::H,
@@ -332,6 +359,30 @@ impl<M: Memory> CPU<M> {
             0x67 => Instruction::Move {
                 dest: Register8::H,
                 src: Register8::A,
+            },
+            0x68 => Instruction::Move {
+                dest: Register8::L,
+                src: Register8::B,
+            },
+            0x69 => Instruction::Move {
+                dest: Register8::L,
+                src: Register8::C,
+            },
+            0x6A => Instruction::Move {
+                dest: Register8::L,
+                src: Register8::D,
+            },
+            0x6B => Instruction::Move {
+                dest: Register8::L,
+                src: Register8::E,
+            },
+            0x6C => Instruction::Move {
+                dest: Register8::L,
+                src: Register8::H,
+            },
+            0x6D => Instruction::Move {
+                dest: Register8::L,
+                src: Register8::L,
             },
             0x6E => Instruction::ReadIndirectToReg8 {
                 addr: Register16::HL,
