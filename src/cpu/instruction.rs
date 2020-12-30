@@ -151,12 +151,24 @@ pub enum Instruction {
         reg: Register8,
         bit: u8,
     },
+    BitTestIndirect {
+        addr: Register16,
+        bit: u8,
+    },
     ResetBit {
         reg: Register8,
         bit: u8,
     },
+    ResetBitIndirect {
+        addr: Register16,
+        bit: u8,
+    },
     SetBit {
         reg: Register8,
+        bit: u8,
+    },
+    SetBitIndirect {
+        addr: Register16,
         bit: u8,
     },
     CallAddr {
@@ -213,30 +225,56 @@ pub enum Instruction {
         // different instruction because of flags
         reg: Register8,
     },
+    RotateLeftThroughCarryWithIndirect {
+        addr: Register16,
+    },
     RotateRightThroughCarryA,
     RotateRightThroughCarry {
         reg: Register8,
+    },
+    RotateRightThroughCarryWithIndirect {
+        addr: Register16,
     },
     RotateLeftA,
     RotateLeft {
         // different instruction because of flags
         reg: Register8,
     },
+    RotateLeftWithIndirect {
+        // different instruction because of flags
+        addr: Register16,
+    },
     RotateRightA,
     RotateRight {
         reg: Register8,
     },
+    RotateRightWithIndirect {
+        // different instruction because of flags
+        addr: Register16,
+    },
     ShiftLeftIntoCarry {
         reg: Register8,
+    },
+    ShiftLeftIntoCarryWithIndirect {
+        addr: Register16,
     },
     ShiftRightWithZeroIntoCarry {
         reg: Register8,
     },
+    ShiftRightWithZeroIntoCarryWithIndirect {
+        addr: Register16,
+    },
     ShiftRightWithSignIntoCarry {
         reg: Register8,
     },
+    ShiftRightWithSignIntoCarryWithIndirect {
+        addr: Register16,
+    },
     SwapReg8 {
         reg: Register8,
+    },
+    SwapIndirect {
+        addr: Register16,
     },
     SetCarryFlag,
     ComplementCarryFlag,
@@ -424,6 +462,9 @@ impl fmt::Display for Instruction {
             Instruction::BitTest { reg, bit } => write!(f, "BIT {}, {}", bit, reg),
             Instruction::ResetBit { reg, bit } => write!(f, "RES {}, {}", bit, reg),
             Instruction::SetBit { reg, bit } => write!(f, "SET {}, {}", bit, reg),
+            Instruction::BitTestIndirect { addr, bit } => write!(f, "BIT {}, ({})", bit, addr),
+            Instruction::ResetBitIndirect { addr, bit } => write!(f, "RES {}, ({})", bit, addr),
+            Instruction::SetBitIndirect { addr, bit } => write!(f, "SET {}, ({})", bit, addr),
             Instruction::CallAddr { condition, addr } => {
                 if let Some(cond) = condition {
                     write!(f, "CALL {}, ${:04x}", cond, addr)
@@ -494,17 +535,26 @@ impl fmt::Display for Instruction {
             Instruction::RotateLeftThroughCarry { reg } => {
                 write!(f, "RL {}", reg)
             }
+            Instruction::RotateLeftThroughCarryWithIndirect { addr } => {
+                write!(f, "RL ({})", addr)
+            }
             Instruction::RotateRightThroughCarryA => {
                 write!(f, "RRA")
             }
             Instruction::RotateRightThroughCarry { reg } => {
                 write!(f, "RR {}", reg)
             }
+            Instruction::RotateRightThroughCarryWithIndirect { addr } => {
+                write!(f, "RR ({})", addr)
+            }
             Instruction::RotateLeftA => {
                 write!(f, "RLCA")
             }
             Instruction::RotateLeft { reg } => {
                 write!(f, "RLC {}", reg)
+            }
+            Instruction::RotateLeftWithIndirect { addr } => {
+                write!(f, "RLC ({})", addr)
             }
             Instruction::RotateRightA => {
                 write!(f, "RRCA")
@@ -521,8 +571,24 @@ impl fmt::Display for Instruction {
             Instruction::ShiftRightWithSignIntoCarry { reg } => {
                 write!(f, "SRA {}", reg)
             }
+
+            Instruction::RotateRightWithIndirect { addr } => {
+                write!(f, "RRC ({})", addr)
+            }
+            Instruction::ShiftLeftIntoCarryWithIndirect { addr } => {
+                write!(f, "SLA ({})", addr)
+            }
+            Instruction::ShiftRightWithZeroIntoCarryWithIndirect { addr } => {
+                write!(f, "SRL ({})", addr)
+            }
+            Instruction::ShiftRightWithSignIntoCarryWithIndirect { addr } => {
+                write!(f, "SRA ({})", addr)
+            }
             Instruction::SwapReg8 { reg } => {
                 write!(f, "SWAP {}", reg)
+            }
+            Instruction::SwapIndirect { addr } => {
+                write!(f, "SWAP ({})", addr)
             }
             Instruction::SetCarryFlag => write!(f, "SCF"),
             Instruction::ComplementCarryFlag => write!(f, "CCF"),
@@ -813,6 +879,32 @@ impl Instruction {
                     bit,
                 },
             ],
+            Instruction::BitTestIndirect { addr, bit } => vec![
+                MicroOp::NOP,
+                MicroOp::NOP,
+                MicroOp::BitTest {
+                    reg: addr.into(),
+                    bit,
+                },
+            ],
+            Instruction::ResetBitIndirect { addr, bit } => vec![
+                MicroOp::NOP,
+                MicroOp::NOP,
+                MicroOp::NOP,
+                MicroOp::ResetBit {
+                    reg: addr.into(),
+                    bit,
+                },
+            ],
+            Instruction::SetBitIndirect { addr, bit } => vec![
+                MicroOp::NOP,
+                MicroOp::NOP,
+                MicroOp::NOP,
+                MicroOp::SetBit {
+                    reg: addr.into(),
+                    bit,
+                },
+            ],
             Instruction::CallAddr { condition, addr } => {
                 if let Some(cond) = condition {
                     //
@@ -1030,6 +1122,17 @@ impl Instruction {
                     },
                 ]
             }
+            Instruction::RotateLeftThroughCarryWithIndirect { addr } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::RotateLeftThroughCarry {
+                        reg: addr.into(),
+                        set_zero: true,
+                    },
+                ]
+            }
             Instruction::RotateRightThroughCarryA => vec![MicroOp::RotateRightThroughCarry {
                 reg: Register8::A.into(),
                 set_zero: false,
@@ -1039,6 +1142,17 @@ impl Instruction {
                     MicroOp::NOP,
                     MicroOp::RotateRightThroughCarry {
                         reg: reg.into(),
+                        set_zero: true,
+                    },
+                ]
+            }
+            Instruction::RotateRightThroughCarryWithIndirect { addr } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::RotateRightThroughCarry {
+                        reg: addr.into(),
                         set_zero: true,
                     },
                 ]
@@ -1056,6 +1170,17 @@ impl Instruction {
                     },
                 ]
             }
+            Instruction::RotateLeftWithIndirect { addr } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::RotateLeft {
+                        reg: addr.into(),
+                        set_zero: true,
+                    },
+                ]
+            }
             Instruction::RotateRightA => vec![MicroOp::RotateRight {
                 reg: Register8::A.into(),
                 set_zero: false,
@@ -1069,10 +1194,29 @@ impl Instruction {
                     },
                 ]
             }
+            Instruction::RotateRightWithIndirect { addr } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::RotateRight {
+                        reg: addr.into(),
+                        set_zero: true,
+                    },
+                ]
+            }
             Instruction::ShiftLeftIntoCarry { reg } => {
                 vec![
                     MicroOp::NOP,
                     MicroOp::ShiftLeftIntoCarry { reg: reg.into() },
+                ]
+            }
+            Instruction::ShiftLeftIntoCarryWithIndirect { addr } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::ShiftLeftIntoCarry { reg: addr.into() },
                 ]
             }
             Instruction::ShiftRightWithZeroIntoCarry { reg } => {
@@ -1081,14 +1225,38 @@ impl Instruction {
                     MicroOp::ShiftRightWithZeroIntoCarry { reg: reg.into() },
                 ]
             }
+            Instruction::ShiftRightWithZeroIntoCarryWithIndirect { addr } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::ShiftRightWithZeroIntoCarry { reg: addr.into() },
+                ]
+            }
             Instruction::ShiftRightWithSignIntoCarry { reg } => {
                 vec![
                     MicroOp::NOP,
                     MicroOp::ShiftRightWithSignIntoCarry { reg: reg.into() },
                 ]
             }
+            Instruction::ShiftRightWithSignIntoCarryWithIndirect { addr } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::ShiftRightWithSignIntoCarry { reg: addr.into() },
+                ]
+            }
             Instruction::SwapReg8 { reg } => {
                 vec![MicroOp::NOP, MicroOp::SwapReg8 { reg: reg.into() }]
+            }
+            Instruction::SwapIndirect { addr } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::SwapReg8 { reg: addr.into() },
+                ]
             }
             Instruction::SetCarryFlag => vec![MicroOp::SetCarryFlag],
             Instruction::ComplementCarryFlag => vec![MicroOp::ComplementCarryFlag],

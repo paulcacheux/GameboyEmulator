@@ -572,75 +572,10 @@ pub fn decode_instruction<M: Memory>(cpu: &mut CPU<M>) -> Instruction {
         0xCB => {
             // prefix 0xCB:
             match cpu.fetch_and_advance() {
-                0x00 => Instruction::RotateLeft { reg: Register8::B },
-                0x01 => Instruction::RotateLeft { reg: Register8::C },
-                0x02 => Instruction::RotateLeft { reg: Register8::D },
-                0x03 => Instruction::RotateLeft { reg: Register8::E },
-                0x04 => Instruction::RotateLeft { reg: Register8::H },
-                0x05 => Instruction::RotateLeft { reg: Register8::L },
-                0x07 => Instruction::RotateLeft { reg: Register8::A },
-
-                0x08 => Instruction::RotateRight { reg: Register8::B },
-                0x09 => Instruction::RotateRight { reg: Register8::C },
-                0x0A => Instruction::RotateRight { reg: Register8::D },
-                0x0B => Instruction::RotateRight { reg: Register8::E },
-                0x0C => Instruction::RotateRight { reg: Register8::H },
-                0x0D => Instruction::RotateRight { reg: Register8::L },
-                0x0F => Instruction::RotateRight { reg: Register8::A },
-
-                0x10 => Instruction::RotateLeftThroughCarry { reg: Register8::B },
-                0x11 => Instruction::RotateLeftThroughCarry { reg: Register8::C },
-                0x12 => Instruction::RotateLeftThroughCarry { reg: Register8::D },
-                0x13 => Instruction::RotateLeftThroughCarry { reg: Register8::E },
-                0x14 => Instruction::RotateLeftThroughCarry { reg: Register8::H },
-                0x15 => Instruction::RotateLeftThroughCarry { reg: Register8::L },
-
-                0x17 => Instruction::RotateLeftThroughCarry { reg: Register8::A },
-                0x18 => Instruction::RotateRightThroughCarry { reg: Register8::B },
-                0x19 => Instruction::RotateRightThroughCarry { reg: Register8::C },
-                0x1A => Instruction::RotateRightThroughCarry { reg: Register8::D },
-                0x1B => Instruction::RotateRightThroughCarry { reg: Register8::E },
-                0x1C => Instruction::RotateRightThroughCarry { reg: Register8::H },
-                0x1D => Instruction::RotateRightThroughCarry { reg: Register8::L },
-                0x1F => Instruction::RotateRightThroughCarry { reg: Register8::A },
-
-                0x20 => Instruction::ShiftLeftIntoCarry { reg: Register8::B },
-                0x21 => Instruction::ShiftLeftIntoCarry { reg: Register8::C },
-                0x22 => Instruction::ShiftLeftIntoCarry { reg: Register8::D },
-                0x23 => Instruction::ShiftLeftIntoCarry { reg: Register8::E },
-                0x24 => Instruction::ShiftLeftIntoCarry { reg: Register8::H },
-                0x25 => Instruction::ShiftLeftIntoCarry { reg: Register8::L },
-                0x27 => Instruction::ShiftLeftIntoCarry { reg: Register8::A },
-
-                0x28 => Instruction::ShiftRightWithSignIntoCarry { reg: Register8::B },
-                0x29 => Instruction::ShiftRightWithSignIntoCarry { reg: Register8::C },
-                0x2A => Instruction::ShiftRightWithSignIntoCarry { reg: Register8::D },
-                0x2B => Instruction::ShiftRightWithSignIntoCarry { reg: Register8::E },
-                0x2C => Instruction::ShiftRightWithSignIntoCarry { reg: Register8::H },
-                0x2D => Instruction::ShiftRightWithSignIntoCarry { reg: Register8::L },
-                0x2F => Instruction::ShiftRightWithSignIntoCarry { reg: Register8::A },
-
-                0x30 => Instruction::SwapReg8 { reg: Register8::B },
-                0x31 => Instruction::SwapReg8 { reg: Register8::C },
-                0x32 => Instruction::SwapReg8 { reg: Register8::D },
-                0x33 => Instruction::SwapReg8 { reg: Register8::E },
-                0x34 => Instruction::SwapReg8 { reg: Register8::H },
-                0x35 => Instruction::SwapReg8 { reg: Register8::L },
-                0x37 => Instruction::SwapReg8 { reg: Register8::A },
-
-                0x38 => Instruction::ShiftRightWithZeroIntoCarry { reg: Register8::B },
-                0x39 => Instruction::ShiftRightWithZeroIntoCarry { reg: Register8::C },
-                0x3A => Instruction::ShiftRightWithZeroIntoCarry { reg: Register8::D },
-                0x3B => Instruction::ShiftRightWithZeroIntoCarry { reg: Register8::E },
-                0x3C => Instruction::ShiftRightWithZeroIntoCarry { reg: Register8::H },
-                0x3D => Instruction::ShiftRightWithZeroIntoCarry { reg: Register8::L },
-                0x3F => Instruction::ShiftRightWithZeroIntoCarry { reg: Register8::A },
-
+                opcode @ 0x00..=0x3F => decode_rotate(opcode),
                 opcode @ 0x40..=0x7F => decode_bit_test(opcode),
                 opcode @ 0x80..=0xBF => decode_reset_bit(opcode),
                 opcode @ 0xC0..=0xFF => decode_set_bit(opcode),
-
-                other => panic!("Unknown sub-opcode (prefix 0xCB) {:#x}", other),
             }
         }
         0xCC => Instruction::CallAddr {
@@ -800,6 +735,49 @@ fn decode_reg_bit_ops(reg_opcode: u8) -> (Reg8OrIndirect, u8) {
     }
 }
 
+fn decode_rotate(opcode: u8) -> Instruction {
+    let bit_opcode = opcode >> 4;
+    let reg_opcode = opcode & 0xF;
+    let (reg, offset) = decode_reg_bit_ops(reg_opcode);
+
+    match (bit_opcode, offset, reg) {
+        (0x0, 0, Reg8OrIndirect::Reg8(reg)) => Instruction::RotateLeft { reg },
+        (0x0, 0, Reg8OrIndirect::Indirect(addr)) => Instruction::RotateLeftWithIndirect { addr },
+
+        (0x0, 1, Reg8OrIndirect::Reg8(reg)) => Instruction::RotateRight { reg },
+        (0x0, 1, Reg8OrIndirect::Indirect(addr)) => Instruction::RotateRightWithIndirect { addr },
+
+        (0x1, 0, Reg8OrIndirect::Reg8(reg)) => Instruction::RotateLeftThroughCarry { reg },
+        (0x1, 0, Reg8OrIndirect::Indirect(addr)) => {
+            Instruction::RotateLeftThroughCarryWithIndirect { addr }
+        }
+
+        (0x1, 1, Reg8OrIndirect::Reg8(reg)) => Instruction::RotateRightThroughCarry { reg },
+        (0x1, 1, Reg8OrIndirect::Indirect(addr)) => {
+            Instruction::RotateRightThroughCarryWithIndirect { addr }
+        }
+
+        (0x2, 0, Reg8OrIndirect::Reg8(reg)) => Instruction::ShiftLeftIntoCarry { reg },
+        (0x2, 0, Reg8OrIndirect::Indirect(addr)) => {
+            Instruction::ShiftLeftIntoCarryWithIndirect { addr }
+        }
+
+        (0x2, 1, Reg8OrIndirect::Reg8(reg)) => Instruction::ShiftRightWithSignIntoCarry { reg },
+        (0x2, 1, Reg8OrIndirect::Indirect(addr)) => {
+            Instruction::ShiftRightWithSignIntoCarryWithIndirect { addr }
+        }
+
+        (0x3, 0, Reg8OrIndirect::Reg8(reg)) => Instruction::SwapReg8 { reg },
+        (0x3, 0, Reg8OrIndirect::Indirect(addr)) => Instruction::SwapIndirect { addr },
+        (0x3, 1, Reg8OrIndirect::Reg8(reg)) => Instruction::ShiftRightWithZeroIntoCarry { reg },
+        (0x3, 1, Reg8OrIndirect::Indirect(addr)) => {
+            Instruction::ShiftRightWithZeroIntoCarryWithIndirect { addr }
+        }
+
+        _ => unreachable!(),
+    }
+}
+
 fn decode_bit_test(opcode: u8) -> Instruction {
     let bit_opcode = opcode >> 4;
     let reg_opcode = opcode & 0xF;
@@ -815,9 +793,7 @@ fn decode_bit_test(opcode: u8) -> Instruction {
 
     match reg {
         Reg8OrIndirect::Reg8(reg) => Instruction::BitTest { reg, bit },
-        Reg8OrIndirect::Indirect(_) => {
-            unimplemented!()
-        }
+        Reg8OrIndirect::Indirect(addr) => Instruction::BitTestIndirect { addr, bit },
     }
 }
 
@@ -836,9 +812,7 @@ fn decode_reset_bit(opcode: u8) -> Instruction {
 
     match reg {
         Reg8OrIndirect::Reg8(reg) => Instruction::ResetBit { reg, bit },
-        Reg8OrIndirect::Indirect(_) => {
-            unimplemented!()
-        }
+        Reg8OrIndirect::Indirect(addr) => Instruction::ResetBitIndirect { addr, bit },
     }
 }
 
@@ -857,8 +831,6 @@ fn decode_set_bit(opcode: u8) -> Instruction {
 
     match reg {
         Reg8OrIndirect::Reg8(reg) => Instruction::SetBit { reg, bit },
-        Reg8OrIndirect::Indirect(_) => {
-            unimplemented!()
-        }
+        Reg8OrIndirect::Indirect(addr) => Instruction::SetBitIndirect { addr, bit },
     }
 }
