@@ -43,6 +43,7 @@ pub struct PPU<M: Memory> {
     dot_in_line: u32,
     state: PPUState,
 
+    pub previous_frame: [u8; PIXEL_COUNT],
     pub frame: [u8; PIXEL_COUNT],
     fetcher: Option<Fetcher>,
     fifo: VecDeque<Pixel>,
@@ -58,6 +59,7 @@ impl<M: Memory> PPU<M> {
             dot_in_line: 0,
             state: PPUState::OAMSearchInit,
 
+            previous_frame: [0; PIXEL_COUNT],
             frame: [0; PIXEL_COUNT],
             fetcher: None,
             fifo: VecDeque::new(),
@@ -68,7 +70,7 @@ impl<M: Memory> PPU<M> {
         assert_eq!(PIXEL_COUNT * 4, fb.len());
 
         for (i, pixel) in fb.chunks_exact_mut(4).enumerate() {
-            let color = self.frame[i];
+            let color = self.previous_frame[i];
             pixel.copy_from_slice(&pixel_color_to_screen_color(color));
         }
     }
@@ -107,6 +109,13 @@ impl<M: Memory> PPU<M> {
         self.state = PPUState::current_state(self.dot_in_line, self.scan_line);
     }
 
+    fn clear_frame(&mut self) {
+        for (pixel, previous_pixel) in self.frame.iter_mut().zip(self.previous_frame.iter_mut()) {
+            *previous_pixel = *pixel;
+            *pixel = 0;
+        }
+    }
+
     fn prepare_frame_and_fetcher(&mut self) {
         self.fifo.clear();
 
@@ -139,6 +148,10 @@ impl<M: Memory> PPU<M> {
 
     fn cycle(&mut self) {
         self.update_registers();
+
+        if self.dot_in_line == 0 && self.scan_line == 0 {
+            self.clear_frame();
+        }
 
         match self.state {
             PPUState::OAMSearchInit => {}
