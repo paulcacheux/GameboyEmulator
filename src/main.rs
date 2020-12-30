@@ -96,10 +96,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         match event {
             Event::RedrawRequested(_) => {
                 ppu.draw_into_fb(framebuffer.get_frame());
-                if let Err(_) = framebuffer.render() {
-                    println!("Failed to render framebuffer");
-                    *control_flow = ControlFlow::Exit;
-                }
+                let _ = framebuffer.render();
             }
             Event::MainEventsCleared => {
                 for _ in 0..MACHINE_CYCLE_PER_FRAME {
