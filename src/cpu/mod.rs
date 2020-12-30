@@ -1217,10 +1217,10 @@ impl<M: Memory> CPU<M> {
                     self.sub_a(rhs, false, false);
                 }
                 MicroOp::RotateLeftThroughCarry { reg, set_zero } => {
-                    let value = self.load_reg8(reg);
+                    let value = self.load_reg8_or_indirect(reg);
                     let new_carry = (value >> 7) == 1;
                     let new_value = (value << 1) | (self.flags.contains(Flags::CARRY) as u8);
-                    self.store_reg8(reg, new_value);
+                    self.store_reg8_or_indirect(reg, new_value);
 
                     self.flags = Flags::empty();
                     if new_carry {
@@ -1231,10 +1231,10 @@ impl<M: Memory> CPU<M> {
                     }
                 }
                 MicroOp::RotateRightThroughCarry { reg, set_zero } => {
-                    let value = self.load_reg8(reg);
+                    let value = self.load_reg8_or_indirect(reg);
                     let new_carry = (value & 0x1) == 1;
                     let new_value = ((self.flags.contains(Flags::CARRY) as u8) << 7) | (value >> 1);
-                    self.store_reg8(reg, new_value);
+                    self.store_reg8_or_indirect(reg, new_value);
 
                     self.flags = Flags::empty();
                     if new_carry {
@@ -1245,10 +1245,10 @@ impl<M: Memory> CPU<M> {
                     }
                 }
                 MicroOp::RotateLeft { reg, set_zero } => {
-                    let value = self.load_reg8(reg);
+                    let value = self.load_reg8_or_indirect(reg);
                     let new_carry = (value >> 7) == 1;
                     let new_value = value.rotate_left(1);
-                    self.store_reg8(reg, new_value);
+                    self.store_reg8_or_indirect(reg, new_value);
 
                     self.flags = Flags::empty();
                     if new_carry {
@@ -1259,10 +1259,10 @@ impl<M: Memory> CPU<M> {
                     }
                 }
                 MicroOp::RotateRight { reg, set_zero } => {
-                    let value = self.load_reg8(reg);
+                    let value = self.load_reg8_or_indirect(reg);
                     let new_carry = (value & 1) == 1;
                     let new_value = value.rotate_right(1);
-                    self.store_reg8(reg, new_value);
+                    self.store_reg8_or_indirect(reg, new_value);
 
                     self.flags = Flags::empty();
                     if new_carry {
@@ -1273,10 +1273,10 @@ impl<M: Memory> CPU<M> {
                     }
                 }
                 MicroOp::ShiftLeftIntoCarry { reg } => {
-                    let value = self.load_reg8(reg);
+                    let value = self.load_reg8_or_indirect(reg);
                     let carry = (value >> 7) == 1;
                     let new_value = value << 1;
-                    self.store_reg8(reg, new_value);
+                    self.store_reg8_or_indirect(reg, new_value);
 
                     self.flags = Flags::empty();
                     if carry {
@@ -1287,10 +1287,10 @@ impl<M: Memory> CPU<M> {
                     }
                 }
                 MicroOp::ShiftRightWithZeroIntoCarry { reg } => {
-                    let value = self.load_reg8(reg);
+                    let value = self.load_reg8_or_indirect(reg);
                     let carry = (value & 0x1) == 1;
                     let new_value = value >> 1;
-                    self.store_reg8(reg, new_value);
+                    self.store_reg8_or_indirect(reg, new_value);
 
                     self.flags = Flags::empty();
                     if carry {
@@ -1301,10 +1301,10 @@ impl<M: Memory> CPU<M> {
                     }
                 }
                 MicroOp::ShiftRightWithSignIntoCarry { reg } => {
-                    let value = self.load_reg8(reg);
+                    let value = self.load_reg8_or_indirect(reg);
                     let carry = (value & 0x1) == 1;
                     let new_value = ((value as i8) >> 1) as u8;
-                    self.store_reg8(reg, new_value);
+                    self.store_reg8_or_indirect(reg, new_value);
 
                     self.flags = Flags::empty();
                     if carry {
@@ -1315,11 +1315,11 @@ impl<M: Memory> CPU<M> {
                     }
                 }
                 MicroOp::SwapReg8 { reg } => {
-                    let value = self.load_reg8(reg);
+                    let value = self.load_reg8_or_indirect(reg);
                     let high = (value & 0xF0) >> 4;
                     let low = value & 0x0F;
                     let res = (low << 4) | high;
-                    self.store_reg8(reg, res);
+                    self.store_reg8_or_indirect(reg, res);
                     self.flags = Flags::empty();
                     if res == 0 {
                         self.flags |= Flags::ZERO;

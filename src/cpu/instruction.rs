@@ -944,68 +944,77 @@ impl Instruction {
                 ]
             }
             Instruction::RotateLeftThroughCarryA => vec![MicroOp::RotateLeftThroughCarry {
-                reg: Register8::A,
+                reg: Register8::A.into(),
                 set_zero: false,
             }],
             Instruction::RotateLeftThroughCarry { reg } => {
                 vec![
                     MicroOp::NOP,
                     MicroOp::RotateLeftThroughCarry {
-                        reg,
+                        reg: reg.into(),
                         set_zero: true,
                     },
                 ]
             }
             Instruction::RotateRightThroughCarryA => vec![MicroOp::RotateRightThroughCarry {
-                reg: Register8::A,
+                reg: Register8::A.into(),
                 set_zero: false,
             }],
             Instruction::RotateRightThroughCarry { reg } => {
                 vec![
                     MicroOp::NOP,
                     MicroOp::RotateRightThroughCarry {
-                        reg,
+                        reg: reg.into(),
                         set_zero: true,
                     },
                 ]
             }
             Instruction::RotateLeftA => vec![MicroOp::RotateLeft {
-                reg: Register8::A,
+                reg: Register8::A.into(),
                 set_zero: false,
             }],
             Instruction::RotateLeft { reg } => {
                 vec![
                     MicroOp::NOP,
                     MicroOp::RotateLeft {
-                        reg,
+                        reg: reg.into(),
                         set_zero: true,
                     },
                 ]
             }
             Instruction::RotateRightA => vec![MicroOp::RotateRight {
-                reg: Register8::A,
+                reg: Register8::A.into(),
                 set_zero: false,
             }],
             Instruction::RotateRight { reg } => {
                 vec![
                     MicroOp::NOP,
                     MicroOp::RotateRight {
-                        reg,
+                        reg: reg.into(),
                         set_zero: true,
                     },
                 ]
             }
             Instruction::ShiftLeftIntoCarry { reg } => {
-                vec![MicroOp::NOP, MicroOp::ShiftLeftIntoCarry { reg }]
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::ShiftLeftIntoCarry { reg: reg.into() },
+                ]
             }
             Instruction::ShiftRightWithZeroIntoCarry { reg } => {
-                vec![MicroOp::NOP, MicroOp::ShiftRightWithZeroIntoCarry { reg }]
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::ShiftRightWithZeroIntoCarry { reg: reg.into() },
+                ]
             }
             Instruction::ShiftRightWithSignIntoCarry { reg } => {
-                vec![MicroOp::NOP, MicroOp::ShiftRightWithSignIntoCarry { reg }]
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::ShiftRightWithSignIntoCarry { reg: reg.into() },
+                ]
             }
             Instruction::SwapReg8 { reg } => {
-                vec![MicroOp::NOP, MicroOp::SwapReg8 { reg }]
+                vec![MicroOp::NOP, MicroOp::SwapReg8 { reg: reg.into() }]
             }
             Instruction::SetCarryFlag => vec![MicroOp::SetCarryFlag],
             Instruction::ComplementCarryFlag => vec![MicroOp::ComplementCarryFlag],

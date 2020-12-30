@@ -134,32 +134,32 @@ pub enum MicroOp {
         rhs: Source8bits,
     },
     RotateLeftThroughCarry {
-        reg: Register8,
+        reg: Reg8OrIndirect,
         set_zero: bool,
     },
     RotateRightThroughCarry {
-        reg: Register8,
+        reg: Reg8OrIndirect,
         set_zero: bool,
     },
     RotateLeft {
-        reg: Register8,
+        reg: Reg8OrIndirect,
         set_zero: bool,
     },
     RotateRight {
-        reg: Register8,
+        reg: Reg8OrIndirect,
         set_zero: bool,
     },
     ShiftLeftIntoCarry {
-        reg: Register8,
+        reg: Reg8OrIndirect,
     },
     ShiftRightWithZeroIntoCarry {
-        reg: Register8,
+        reg: Reg8OrIndirect,
     },
     ShiftRightWithSignIntoCarry {
-        reg: Register8,
+        reg: Reg8OrIndirect,
     },
     SwapReg8 {
-        reg: Register8,
+        reg: Reg8OrIndirect,
     },
     CheckFlags {
         condition: JumpCondition,
