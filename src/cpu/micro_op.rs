@@ -14,6 +14,7 @@ pub enum Source8bits {
     Indirect(Register16),
     Address(u16),
     Literal(u8),
+    ZeroPageOffsetReg8(Register8),
 }
 
 impl From<Register8> for Source8bits {

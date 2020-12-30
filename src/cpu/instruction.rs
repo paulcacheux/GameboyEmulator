@@ -137,6 +137,10 @@ pub enum Instruction {
         lit_offset: u8,
         reg: Register8,
     },
+    ReadZeroPageOffsetReg8ToReg8 {
+        offset: Register8,
+        reg: Register8,
+    },
     PushReg16 {
         reg: Register16,
     },
@@ -380,6 +384,9 @@ impl fmt::Display for Instruction {
             }
             Instruction::ReadZeroPageOffsetLiteralToReg8 { lit_offset, reg } => {
                 write!(f, "LD {}, ($FF00 + ${:02x})", reg, lit_offset)
+            }
+            Instruction::ReadZeroPageOffsetReg8ToReg8 { offset, reg } => {
+                write!(f, "LD {}, ($FF00 + {})", reg, offset)
             }
             Instruction::PushReg16 { reg } => {
                 write!(f, "PUSH {}", reg)
@@ -683,6 +690,13 @@ impl Instruction {
                 MicroOp::Move8Bits {
                     destination: Destination8Bits::Register(reg),
                     source: Source8bits::Address(0xFF00 + lit_offset as u16),
+                },
+            ],
+            Instruction::ReadZeroPageOffsetReg8ToReg8 { offset, reg } => vec![
+                MicroOp::NOP,
+                MicroOp::Move8Bits {
+                    destination: Destination8Bits::Register(reg),
+                    source: Source8bits::ZeroPageOffsetReg8(offset),
                 },
             ],
             Instruction::ReadAtAddressToReg8 { reg, addr } => vec![

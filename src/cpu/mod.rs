@@ -818,6 +818,10 @@ impl<M: Memory> CPU<M> {
             0xF1 => Instruction::PopReg16 {
                 reg: Register16::AF,
             },
+            0xF2 => Instruction::ReadZeroPageOffsetReg8ToReg8 {
+                offset: Register8::C,
+                reg: Register8::A,
+            },
             0xF3 => Instruction::DisableInterrupts,
             // 0xF4 => nothing
             0xF5 => Instruction::PushReg16 {
@@ -867,6 +871,9 @@ impl<M: Memory> CPU<M> {
             Source8bits::Literal(lit) => lit,
             Source8bits::Indirect(addr) => self.memory.read_memory(self.load_reg16(addr)),
             Source8bits::Address(addr) => self.memory.read_memory(addr),
+            Source8bits::ZeroPageOffsetReg8(offset) => self
+                .memory
+                .read_memory(0xFF00 + self.load_reg8(offset) as u16),
         }
     }
 
