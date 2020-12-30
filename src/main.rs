@@ -18,7 +18,6 @@ mod ppu;
 mod utils;
 
 use cpu::CPU;
-use memory::Memory;
 use ppu::{PPU, SCREEN_HEIGHT, SCREEN_WIDTH};
 
 const MULTIPLIER: u32 = 4;
@@ -40,8 +39,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rom_content = std::fs::read(&rom_path)?;
 
     let mut mmu = memory::MMU::new();
-    mmu.write_slice(&rom_content, 0x0);
-    mmu.write_slice(&bootstrap_content, 0x0);
+    mmu.write_bootstrap_rom(&bootstrap_content);
+    mmu.write_rom(&rom_content);
 
     let memory = Rc::new(RwLock::new(mmu));
 
