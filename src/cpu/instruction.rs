@@ -57,6 +57,8 @@ pub enum Instruction {
     SubAWithLiteral {
         literal: u8,
     },
+    DAA,
+    ComplementA,
     WriteReg8ValueAtAddress {
         addr: u16,
         reg: Register8,
@@ -152,6 +154,9 @@ pub enum Instruction {
     ShiftRightIntoCarry {
         reg: Register8,
     },
+    SwapReg8 {
+        reg: Register8,
+    },
     EnableInterrupts,
     DisableInterrupts,
 }
@@ -244,6 +249,8 @@ impl fmt::Display for Instruction {
             Instruction::SubAWithLiteral { literal } => {
                 write!(f, "SUB A, ${:02x}", literal)
             }
+            Instruction::DAA => write!(f, "DAA"),
+            Instruction::ComplementA => write!(f, "CPL"),
             Instruction::WriteReg8ValueAtAddress { addr, reg } => {
                 write!(f, "LD (${:04x}), {}", addr, reg)
             }
@@ -358,6 +365,9 @@ impl fmt::Display for Instruction {
             Instruction::ShiftRightIntoCarry { reg } => {
                 write!(f, "SRL {}", reg)
             }
+            Instruction::SwapReg8 { reg } => {
+                write!(f, "SWAP {}", reg)
+            }
             Instruction::EnableInterrupts => write!(f, "EI"),
             Instruction::DisableInterrupts => write!(f, "DI"),
         }
@@ -452,6 +462,8 @@ impl Instruction {
                     },
                 ]
             }
+            Instruction::DAA => vec![MicroOp::DAA],
+            Instruction::ComplementA => vec![MicroOp::ComplementA],
             Instruction::WriteReg8ValueAtAddress { addr, reg } => {
                 vec![
                     MicroOp::NOP,
@@ -733,6 +745,9 @@ impl Instruction {
             }
             Instruction::ShiftRightIntoCarry { reg } => {
                 vec![MicroOp::NOP, MicroOp::ShiftRightIntoCarry { reg }]
+            }
+            Instruction::SwapReg8 { reg } => {
+                vec![MicroOp::NOP, MicroOp::SwapReg8 { reg }]
             }
             Instruction::EnableInterrupts => vec![MicroOp::EnableInterrupts],
             Instruction::DisableInterrupts => vec![MicroOp::DisableInterrupts],

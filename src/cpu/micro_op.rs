@@ -64,6 +64,8 @@ pub enum MicroOp {
     SubA {
         rhs: Source8bits,
     },
+    DAA,
+    ComplementA,
     WriteMem {
         addr: Register16,
         reg: Register8,
@@ -107,6 +109,9 @@ pub enum MicroOp {
         set_zero: bool,
     },
     ShiftRightIntoCarry {
+        reg: Register8,
+    },
+    SwapReg8 {
         reg: Register8,
     },
     CheckFlags {

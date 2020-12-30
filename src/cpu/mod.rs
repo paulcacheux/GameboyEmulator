@@ -230,6 +230,7 @@ impl<M: Memory> CPU<M> {
                 reg: Register8::H,
                 literal: self.fetch_and_advance(),
             },
+            0x27 => Instruction::DAA,
             0x28 => Instruction::JumpRelative {
                 condition: Some(JumpCondition::Zero),
                 offset: self.fetch_and_advance() as i8,
@@ -245,6 +246,7 @@ impl<M: Memory> CPU<M> {
                 reg: Register8::L,
                 literal: self.fetch_and_advance(),
             },
+            0x2F => Instruction::ComplementA,
             0x29 => Instruction::AddHLWithReg {
                 reg: Register16::HL,
             },
@@ -267,6 +269,10 @@ impl<M: Memory> CPU<M> {
             0x36 => Instruction::WriteLiteralAtIndirect {
                 addr: Register16::HL,
                 literal: self.fetch_and_advance(),
+            },
+            0x38 => Instruction::JumpRelative {
+                condition: Some(JumpCondition::Carry),
+                offset: self.fetch_and_advance() as i8,
             },
             0x3C => Instruction::IncReg8 { reg: Register8::A },
             0x3D => Instruction::DecReg8 { reg: Register8::A },
@@ -390,6 +396,9 @@ impl<M: Memory> CPU<M> {
                 addr: Register16::HL,
             },
             0xB7 => Instruction::OrAWithReg8 { reg: Register8::A },
+            0xB8 => Instruction::CompareAWithReg { reg: Register8::B },
+            0xB9 => Instruction::CompareAWithReg { reg: Register8::C },
+            0xBA => Instruction::CompareAWithReg { reg: Register8::D },
             0xC1 => Instruction::PopReg16 {
                 reg: Register16::BC,
             },
@@ -421,6 +430,7 @@ impl<M: Memory> CPU<M> {
                     0x11 => Instruction::RotateLeftThroughCarry { reg: Register8::C },
                     0x19 => Instruction::RotateRightThroughCarry { reg: Register8::C },
                     0x1A => Instruction::RotateRightThroughCarry { reg: Register8::D },
+                    0x37 => Instruction::SwapReg8 { reg: Register8::A },
                     0x38 => Instruction::ShiftRightIntoCarry { reg: Register8::B },
                     0x7C => Instruction::BitTest {
                         reg: Register8::H,
@@ -447,6 +457,9 @@ impl<M: Memory> CPU<M> {
             },
             0xD6 => Instruction::SubAWithLiteral {
                 literal: self.fetch_and_advance(),
+            },
+            0xD8 => Instruction::Return {
+                condition: Some(JumpCondition::Carry),
             },
             0xE0 => Instruction::WriteReg8ValueAtZeroPageOffsetLiteral {
                 lit_offset: self.fetch_and_advance(),
@@ -635,6 +648,41 @@ impl<M: Memory> CPU<M> {
                     self.reg_a = res;
                     self.update_flags_arith(res, true, carry, half_carry);
                 }
+                MicroOp::DAA => {
+                    let mut a = self.reg_a as u32;
+
+                    if !self.flags.contains(Flags::NEGATIVE) {
+                        if self.flags.contains(Flags::HALF_CARRY) || (a & 0xF) > 9 {
+                            a += 0x06;
+                        }
+                        if self.flags.contains(Flags::CARRY) || a > 0x9F {
+                            a += 0x60;
+                        }
+                    } else {
+                        if self.flags.contains(Flags::HALF_CARRY) {
+                            a = (a - 6) & 0xFF;
+                        }
+                        if self.flags.contains(Flags::CARRY) {
+                            a -= 0x60;
+                        }
+                    }
+
+                    self.flags.remove(Flags::HALF_CARRY | Flags::ZERO);
+
+                    if (a & 0x100) == 0x100 {
+                        self.flags |= Flags::CARRY;
+                    }
+
+                    a &= 0xFF;
+                    if a == 0 {
+                        self.flags |= Flags::ZERO;
+                    }
+                    self.reg_a = a as u8;
+                }
+                MicroOp::ComplementA => {
+                    self.reg_a = !self.reg_a;
+                    self.flags |= Flags::NEGATIVE | Flags::HALF_CARRY;
+                }
                 MicroOp::WriteMem {
                     addr,
                     reg,
@@ -774,6 +822,17 @@ impl<M: Memory> CPU<M> {
                         self.flags |= Flags::CARRY;
                     }
                     if new_value == 0 {
+                        self.flags |= Flags::ZERO;
+                    }
+                }
+                MicroOp::SwapReg8 { reg } => {
+                    let value = self.load_reg8(reg);
+                    let high = (value & 0xF0) >> 4;
+                    let low = value & 0x0F;
+                    let res = (low << 4) | high;
+                    self.store_reg8(reg, res);
+                    self.flags = Flags::empty();
+                    if res == 0 {
                         self.flags |= Flags::ZERO;
                     }
                 }
