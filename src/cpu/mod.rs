@@ -702,6 +702,7 @@ impl<M: Memory> CPU<M> {
             0xC6 => Instruction::AddAWithLiteral {
                 literal: self.fetch_and_advance(),
             },
+            0xC7 => Instruction::Reset { offset: 0x00 },
             0xC8 => Instruction::Return {
                 condition: Some(JumpCondition::Zero),
             },
@@ -795,6 +796,7 @@ impl<M: Memory> CPU<M> {
             0xCE => Instruction::AdcAWithLiteral {
                 literal: self.fetch_and_advance(),
             },
+            0xCF => Instruction::Reset { offset: 0x08 },
             0xD0 => Instruction::Return {
                 condition: Some(JumpCondition::NonCarry),
             },
@@ -816,9 +818,11 @@ impl<M: Memory> CPU<M> {
             0xD6 => Instruction::SubAWithLiteral {
                 literal: self.fetch_and_advance(),
             },
+            0xD7 => Instruction::Reset { offset: 0x10 },
             0xD8 => Instruction::Return {
                 condition: Some(JumpCondition::Carry),
             },
+            0xD9 => Instruction::ReturnInterrupt,
             0xDA => Instruction::JumpAbsolute {
                 condition: Some(JumpCondition::Carry),
                 addr: self.fetch_and_advance_u16(),
@@ -832,6 +836,7 @@ impl<M: Memory> CPU<M> {
             0xDE => Instruction::SbcAWithLiteral {
                 literal: self.fetch_and_advance(),
             },
+            0xDF => Instruction::Reset { offset: 0x18 },
             0xE0 => Instruction::WriteReg8ValueAtZeroPageOffsetLiteral {
                 lit_offset: self.fetch_and_advance(),
                 reg: Register8::A,
@@ -851,6 +856,7 @@ impl<M: Memory> CPU<M> {
             0xE6 => Instruction::AndAWithLiteral {
                 literal: self.fetch_and_advance(),
             },
+            0xE7 => Instruction::Reset { offset: 0x20 },
             0xE8 => Instruction::AddOffsetToReg16 {
                 reg: Register16::SP,
                 offset: self.fetch_and_advance() as i8,
@@ -868,6 +874,7 @@ impl<M: Memory> CPU<M> {
             0xEE => Instruction::XorAWithLiteral {
                 literal: self.fetch_and_advance(),
             },
+            0xEF => Instruction::Reset { offset: 0x28 },
             0xF0 => Instruction::ReadZeroPageOffsetLiteralToReg8 {
                 reg: Register8::A,
                 lit_offset: self.fetch_and_advance(),
@@ -887,6 +894,7 @@ impl<M: Memory> CPU<M> {
             0xF6 => Instruction::OrAWithLiteral {
                 literal: self.fetch_and_advance(),
             },
+            0xF7 => Instruction::Reset { offset: 0x30 },
             0xF8 => Instruction::LoadAddressOffsetIntoReg16 {
                 dest: Register16::HL,
                 base: Register16::SP,
@@ -906,6 +914,7 @@ impl<M: Memory> CPU<M> {
             0xFE => Instruction::CompareAWithLiteral {
                 literal: self.fetch_and_advance(),
             },
+            0xFF => Instruction::Reset { offset: 0x38 },
             _ => panic!("Unknown opcode {:#x} at {:#x}", opcode, pc),
         }
     }

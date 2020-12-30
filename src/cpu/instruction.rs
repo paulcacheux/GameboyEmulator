@@ -158,6 +158,7 @@ pub enum Instruction {
     Return {
         condition: Option<JumpCondition>,
     },
+    ReturnInterrupt,
     JumpRelative {
         condition: Option<JumpCondition>,
         offset: i8,
@@ -168,6 +169,9 @@ pub enum Instruction {
     },
     JumpRegister16 {
         reg: Register16,
+    },
+    Reset {
+        offset: u16,
     },
     IncReg16 {
         reg: Register16,
@@ -424,6 +428,9 @@ impl fmt::Display for Instruction {
                     write!(f, "RET")
                 }
             }
+            Instruction::ReturnInterrupt => {
+                write!(f, "RETI")
+            }
             Instruction::JumpRelative { condition, offset } => {
                 if let Some(cond) = condition {
                     write!(f, "JR {}, {}", cond, offset) // TODO: change the offset format
@@ -440,6 +447,9 @@ impl fmt::Display for Instruction {
             }
             Instruction::JumpRegister16 { reg } => {
                 write!(f, "JP {}", reg)
+            }
+            Instruction::Reset { offset } => {
+                write!(f, "RST ${:02x}", offset)
             }
             Instruction::IncReg16 { reg } => {
                 write!(f, "INC {}", reg)
@@ -828,7 +838,6 @@ impl Instruction {
                     ]
                 }
             }
-
             Instruction::Return { condition } => {
                 if let Some(cond) = condition {
                     vec![
@@ -867,6 +876,22 @@ impl Instruction {
                         },
                     ]
                 }
+            }
+            Instruction::ReturnInterrupt => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::ReadMem {
+                        reg: Register8::PCLow,
+                        addr: Register16::SP,
+                        post_op: Some(PrePostOperation::Inc),
+                    },
+                    MicroOp::ReadMem {
+                        reg: Register8::PCHigh,
+                        addr: Register16::SP,
+                        post_op: Some(PrePostOperation::Inc),
+                    },
+                    MicroOp::EnableInterrupts,
+                ]
             }
             Instruction::JumpRelative { condition, offset } => {
                 if let Some(cond) = condition {
@@ -908,6 +933,25 @@ impl Instruction {
                 destination: Register16::PC,
                 source: reg,
             }],
+            Instruction::Reset { offset } => vec![
+                MicroOp::NOP,
+                MicroOp::WriteMem {
+                    addr: Register16::SP,
+                    reg: Register8::PCHigh,
+                    pre_op: Some(PrePostOperation::Dec),
+                    post_op: None,
+                },
+                MicroOp::WriteMem {
+                    addr: Register16::SP,
+                    reg: Register8::PCLow,
+                    pre_op: Some(PrePostOperation::Dec),
+                    post_op: None,
+                },
+                MicroOp::LoadReg16Lit {
+                    reg: Register16::PC,
+                    literal: offset,
+                },
+            ],
             Instruction::IncReg16 { reg } => vec![MicroOp::NOP, MicroOp::IncReg16 { reg }],
             Instruction::IncReg8 { reg } => vec![MicroOp::Inc { reg: reg.into() }],
             Instruction::IncIndirect { addr } => {
