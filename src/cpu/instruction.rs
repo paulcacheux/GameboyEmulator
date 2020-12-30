@@ -10,6 +10,10 @@ pub enum Instruction {
         dest: Register8,
         src: Register8,
     },
+    Move16Bits {
+        dest: Register16,
+        src: Register16,
+    },
     LoadLiteralIntoReg8 {
         reg: Register8,
         literal: u8,
@@ -62,6 +66,10 @@ pub enum Instruction {
     WriteReg8ValueAtAddress {
         addr: u16,
         reg: Register8,
+    },
+    WriteReg16ValueAtAddress {
+        addr: u16,
+        reg: Register16,
     },
     WriteLiteralAtIndirect {
         addr: Register16,
@@ -203,6 +211,9 @@ impl fmt::Display for Instruction {
             Instruction::Move { dest, src } => {
                 write!(f, "LD {}, {}", dest, src)
             }
+            Instruction::Move16Bits { dest, src } => {
+                write!(f, "LD {}, {}", dest, src)
+            }
             Instruction::LoadLiteralIntoReg8 { reg, literal } => {
                 write!(f, "LD {}, ${:02x}", reg, literal)
             }
@@ -251,6 +262,9 @@ impl fmt::Display for Instruction {
             Instruction::DAA => write!(f, "DAA"),
             Instruction::ComplementA => write!(f, "CPL"),
             Instruction::WriteReg8ValueAtAddress { addr, reg } => {
+                write!(f, "LD (${:04x}), {}", addr, reg)
+            }
+            Instruction::WriteReg16ValueAtAddress { addr, reg } => {
                 write!(f, "LD (${:04x}), {}", addr, reg)
             }
             Instruction::WriteLiteralAtIndirect { addr, literal } => {
@@ -378,6 +392,15 @@ impl Instruction {
         match self {
             Instruction::NOP => vec![MicroOp::NOP],
             Instruction::Move { dest, src } => vec![simpl::move_micro_op(dest, src)],
+            Instruction::Move16Bits { dest, src } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::Move16Bits {
+                        destination: dest,
+                        source: src,
+                    },
+                ]
+            }
             Instruction::LoadLiteralIntoReg8 { reg, literal } => {
                 vec![MicroOp::NOP, simpl::load_literal_into_reg8(literal, reg)]
             }
@@ -471,6 +494,21 @@ impl Instruction {
                     MicroOp::Move8Bits {
                         destination: Destination8Bits::Address(addr),
                         source: reg.into(),
+                    },
+                ]
+            }
+            Instruction::WriteReg16ValueAtAddress { addr, reg } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::Move8Bits {
+                        destination: Destination8Bits::Address(addr),
+                        source: reg.lower_half().into(),
+                    },
+                    MicroOp::Move8Bits {
+                        destination: Destination8Bits::Address(addr + 1),
+                        source: reg.higher_half().into(),
                     },
                 ]
             }

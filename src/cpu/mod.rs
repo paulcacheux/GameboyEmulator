@@ -167,6 +167,10 @@ impl<M: Memory> CPU<M> {
                 reg: Register8::B,
                 literal: self.fetch_and_advance(),
             },
+            0x08 => Instruction::WriteReg16ValueAtAddress {
+                addr: self.fetch_and_advance_u16(),
+                reg: Register16::SP,
+            },
             0x0C => Instruction::IncReg8 { reg: Register8::C },
             0x0D => Instruction::DecReg8 { reg: Register8::C },
             0x0E => Instruction::LoadLiteralIntoReg8 {
@@ -307,9 +311,23 @@ impl<M: Memory> CPU<M> {
                 dest: Register8::D,
                 src: Register8::A,
             },
+            0x5D => Instruction::Move {
+                dest: Register8::E,
+                src: Register8::L,
+            },
+            0x5E => Instruction::ReadIndirectToReg8 {
+                reg: Register8::E,
+                addr: Register16::HL,
+                post_op: None,
+            },
             0x5F => Instruction::Move {
                 dest: Register8::E,
                 src: Register8::A,
+            },
+            0x66 => Instruction::ReadIndirectToReg8 {
+                addr: Register16::HL,
+                reg: Register8::H,
+                post_op: None,
             },
             0x67 => Instruction::Move {
                 dest: Register8::H,
@@ -337,6 +355,21 @@ impl<M: Memory> CPU<M> {
             0x72 => Instruction::WriteReg8ValueAtIndirect {
                 addr: Register16::HL,
                 reg: Register8::D,
+                post_op: None,
+            },
+            0x73 => Instruction::WriteReg8ValueAtIndirect {
+                addr: Register16::HL,
+                reg: Register8::E,
+                post_op: None,
+            },
+            0x74 => Instruction::WriteReg8ValueAtIndirect {
+                addr: Register16::HL,
+                reg: Register8::H,
+                post_op: None,
+            },
+            0x75 => Instruction::WriteReg8ValueAtIndirect {
+                addr: Register16::HL,
+                reg: Register8::L,
                 post_op: None,
             },
             0x77 => Instruction::WriteReg8ValueAtIndirect {
@@ -428,8 +461,12 @@ impl<M: Memory> CPU<M> {
                 // prefix 0xCB:
                 match self.fetch_and_advance() {
                     0x11 => Instruction::RotateLeftThroughCarry { reg: Register8::C },
+                    0x18 => Instruction::RotateRightThroughCarry { reg: Register8::B },
                     0x19 => Instruction::RotateRightThroughCarry { reg: Register8::C },
                     0x1A => Instruction::RotateRightThroughCarry { reg: Register8::D },
+                    0x1B => Instruction::RotateRightThroughCarry { reg: Register8::E },
+                    0x1C => Instruction::RotateRightThroughCarry { reg: Register8::H },
+                    0x1D => Instruction::RotateRightThroughCarry { reg: Register8::L },
                     0x37 => Instruction::SwapReg8 { reg: Register8::A },
                     0x38 => Instruction::ShiftRightIntoCarry { reg: Register8::B },
                     0x7C => Instruction::BitTest {
@@ -498,6 +535,10 @@ impl<M: Memory> CPU<M> {
             0xF3 => Instruction::DisableInterrupts,
             0xF5 => Instruction::PushReg16 {
                 reg: Register16::AF,
+            },
+            0xF9 => Instruction::Move16Bits {
+                dest: Register16::SP,
+                src: Register16::HL,
             },
             0xFA => Instruction::ReadAtAddressToReg8 {
                 addr: self.fetch_and_advance_u16(),
