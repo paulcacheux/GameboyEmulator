@@ -130,6 +130,14 @@ pub enum MicroOp {
         reg: Register8,
         set_zero: bool,
     },
+    RotateLeft {
+        reg: Register8,
+        set_zero: bool,
+    },
+    RotateRight {
+        reg: Register8,
+        set_zero: bool,
+    },
     ShiftRightIntoCarry {
         reg: Register8,
     },

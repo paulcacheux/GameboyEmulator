@@ -172,6 +172,7 @@ impl<M: Memory> CPU<M> {
                 reg: Register8::B,
                 literal: self.fetch_and_advance(),
             },
+            0x07 => Instruction::RotateLeftA,
             0x08 => Instruction::WriteReg16ValueAtAddress {
                 addr: self.fetch_and_advance_u16(),
                 reg: Register16::SP,
@@ -193,6 +194,7 @@ impl<M: Memory> CPU<M> {
                 reg: Register8::C,
                 literal: self.fetch_and_advance(),
             },
+            0x0F => Instruction::RotateRightA,
             0x11 => Instruction::LoadLiteralIntoReg16 {
                 reg: Register16::DE,
                 literal: self.fetch_and_advance_u16(),
@@ -711,13 +713,38 @@ impl<M: Memory> CPU<M> {
             0xCB => {
                 // prefix 0xCB:
                 match self.fetch_and_advance() {
+                    0x00 => Instruction::RotateLeft { reg: Register8::B },
+                    0x01 => Instruction::RotateLeft { reg: Register8::C },
+                    0x02 => Instruction::RotateLeft { reg: Register8::D },
+                    0x03 => Instruction::RotateLeft { reg: Register8::E },
+                    0x04 => Instruction::RotateLeft { reg: Register8::H },
+                    0x05 => Instruction::RotateLeft { reg: Register8::L },
+                    0x07 => Instruction::RotateLeft { reg: Register8::A },
+
+                    0x08 => Instruction::RotateRight { reg: Register8::B },
+                    0x09 => Instruction::RotateRight { reg: Register8::C },
+                    0x0A => Instruction::RotateRight { reg: Register8::D },
+                    0x0B => Instruction::RotateRight { reg: Register8::E },
+                    0x0C => Instruction::RotateRight { reg: Register8::H },
+                    0x0D => Instruction::RotateRight { reg: Register8::L },
+                    0x0F => Instruction::RotateRight { reg: Register8::A },
+
+                    0x10 => Instruction::RotateLeftThroughCarry { reg: Register8::B },
                     0x11 => Instruction::RotateLeftThroughCarry { reg: Register8::C },
+                    0x12 => Instruction::RotateLeftThroughCarry { reg: Register8::D },
+                    0x13 => Instruction::RotateLeftThroughCarry { reg: Register8::E },
+                    0x14 => Instruction::RotateLeftThroughCarry { reg: Register8::H },
+                    0x15 => Instruction::RotateLeftThroughCarry { reg: Register8::L },
+
+                    0x17 => Instruction::RotateLeftThroughCarry { reg: Register8::A },
                     0x18 => Instruction::RotateRightThroughCarry { reg: Register8::B },
                     0x19 => Instruction::RotateRightThroughCarry { reg: Register8::C },
                     0x1A => Instruction::RotateRightThroughCarry { reg: Register8::D },
                     0x1B => Instruction::RotateRightThroughCarry { reg: Register8::E },
                     0x1C => Instruction::RotateRightThroughCarry { reg: Register8::H },
                     0x1D => Instruction::RotateRightThroughCarry { reg: Register8::L },
+                    0x1F => Instruction::RotateRightThroughCarry { reg: Register8::A },
+
                     0x37 => Instruction::SwapReg8 { reg: Register8::A },
                     0x38 => Instruction::ShiftRightIntoCarry { reg: Register8::B },
                     0x7C => Instruction::BitTest {
@@ -1150,7 +1177,7 @@ impl<M: Memory> CPU<M> {
                         new_value,
                         true,
                         self.flags.contains(Flags::CARRY),
-                        half_carry,
+                        !half_carry,
                     );
                 }
                 MicroOp::DecIndirect { addr } => {
@@ -1164,7 +1191,7 @@ impl<M: Memory> CPU<M> {
                         new_value,
                         true,
                         self.flags.contains(Flags::CARRY),
-                        half_carry,
+                        !half_carry,
                     );
                 }
                 MicroOp::CompareA { rhs } => {
@@ -1189,6 +1216,34 @@ impl<M: Memory> CPU<M> {
                     let value = self.load_reg8(reg);
                     let new_carry = (value & 0x1) == 1;
                     let new_value = ((self.flags.contains(Flags::CARRY) as u8) << 7) | (value >> 1);
+                    self.store_reg8(reg, new_value);
+
+                    self.flags = Flags::empty();
+                    if new_carry {
+                        self.flags |= Flags::CARRY;
+                    }
+                    if set_zero && new_value == 0 {
+                        self.flags |= Flags::ZERO;
+                    }
+                }
+                MicroOp::RotateLeft { reg, set_zero } => {
+                    let value = self.load_reg8(reg);
+                    let new_carry = (value >> 7) == 1;
+                    let new_value = value.rotate_left(1);
+                    self.store_reg8(reg, new_value);
+
+                    self.flags = Flags::empty();
+                    if new_carry {
+                        self.flags |= Flags::CARRY;
+                    }
+                    if set_zero && new_value == 0 {
+                        self.flags |= Flags::ZERO;
+                    }
+                }
+                MicroOp::RotateRight { reg, set_zero } => {
+                    let value = self.load_reg8(reg);
+                    let new_carry = (value & 1) == 1;
+                    let new_value = value.rotate_right(1);
                     self.store_reg8(reg, new_value);
 
                     self.flags = Flags::empty();

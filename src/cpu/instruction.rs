@@ -205,6 +205,15 @@ pub enum Instruction {
     RotateRightThroughCarry {
         reg: Register8,
     },
+    RotateLeftA,
+    RotateLeft {
+        // different instruction because of flags
+        reg: Register8,
+    },
+    RotateRightA,
+    RotateRight {
+        reg: Register8,
+    },
     ShiftRightIntoCarry {
         reg: Register8,
     },
@@ -464,6 +473,18 @@ impl fmt::Display for Instruction {
             }
             Instruction::RotateRightThroughCarry { reg } => {
                 write!(f, "RR {}", reg)
+            }
+            Instruction::RotateLeftA => {
+                write!(f, "RLCA")
+            }
+            Instruction::RotateLeft { reg } => {
+                write!(f, "RLC {}", reg)
+            }
+            Instruction::RotateRightA => {
+                write!(f, "RRCA")
+            }
+            Instruction::RotateRight { reg } => {
+                write!(f, "RRC {}", reg)
             }
             Instruction::ShiftRightIntoCarry { reg } => {
                 write!(f, "SRL {}", reg)
@@ -923,6 +944,32 @@ impl Instruction {
                 vec![
                     MicroOp::NOP,
                     MicroOp::RotateRightThroughCarry {
+                        reg,
+                        set_zero: true,
+                    },
+                ]
+            }
+            Instruction::RotateLeftA => vec![MicroOp::RotateLeft {
+                reg: Register8::A,
+                set_zero: false,
+            }],
+            Instruction::RotateLeft { reg } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::RotateLeft {
+                        reg,
+                        set_zero: true,
+                    },
+                ]
+            }
+            Instruction::RotateRightA => vec![MicroOp::RotateRight {
+                reg: Register8::A,
+                set_zero: false,
+            }],
+            Instruction::RotateRight { reg } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::RotateRight {
                         reg,
                         set_zero: true,
                     },
