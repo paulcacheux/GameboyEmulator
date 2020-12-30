@@ -4,7 +4,7 @@ use log::debug;
 
 #[derive(Debug, Clone)]
 pub struct MMU {
-    bootstrap_rom: Box<[u8; 0x8000]>,
+    bootstrap_rom: Box<[u8; 0x100]>,
     rom: Box<[u8; 0x8000]>,
     vram: Box<[u8; 0x2000]>,
     eram: Box<[u8; 0x2000]>,
@@ -18,7 +18,7 @@ pub struct MMU {
 impl MMU {
     pub fn new() -> Self {
         MMU {
-            bootstrap_rom: Box::new([0; 0x8000]),
+            bootstrap_rom: Box::new([0; 0x100]),
             rom: Box::new([0; 0x8000]),
             vram: Box::new([0; 0x2000]),
             eram: Box::new([0; 0x2000]),
@@ -52,6 +52,10 @@ impl MMU {
         } else {
             self.bootstrap_rom.as_mut()
         }
+    }
+
+    pub fn unmount_bootstrap_rom(&mut self) {
+        self.write_memory(BOOTSTRAP_ROM_MOUNT_CONTROL_ADDR, 1);
     }
 }
 

@@ -30,22 +30,40 @@ const MACHINE_CYCLE_PER_FRAME: u32 = MACHINE_CYCLE_FREQ / 60;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
-    let bootstrap_path = std::env::args()
-        .nth(1)
-        .expect("Failed to get bootstrap path");
-    let rom_path = std::env::args().nth(2).expect("Failed to get rom path");
+    let (bootstrap, rom) = match std::env::args().len() {
+        2 => {
+            let rom_path = std::env::args().nth(1).expect("Failed to get rom path");
+            let rom_content = std::fs::read(&rom_path)?;
+            (None, rom_content)
+        }
+        3 => {
+            let bootstrap_path = std::env::args()
+                .nth(1)
+                .expect("Failed to get bootstrap path");
+            let rom_path = std::env::args().nth(2).expect("Failed to get rom path");
 
-    let bootstrap_content = std::fs::read(&bootstrap_path)?;
-    let rom_content = std::fs::read(&rom_path)?;
+            let bootstrap_content = std::fs::read(&bootstrap_path)?;
+            let rom_content = std::fs::read(&rom_path)?;
+            (Some(bootstrap_content), rom_content)
+        }
+        _ => panic!("Incorrect arguments"),
+    };
 
     let mut mmu = memory::MMU::new();
-    mmu.write_bootstrap_rom(&bootstrap_content);
-    mmu.write_rom(&rom_content);
+    mmu.write_rom(&rom);
+    if let Some(bootstrap) = &bootstrap {
+        mmu.write_bootstrap_rom(bootstrap);
+    } else {
+        mmu.unmount_bootstrap_rom();
+    }
 
     let memory = Rc::new(RwLock::new(mmu));
 
     let interrupt_controller = Rc::new(Mutex::new(InterruptController::new()));
     let mut cpu = CPU::new(memory.clone());
+    if bootstrap.is_none() {
+        cpu.pc = 0x100;
+    }
     let mut ppu = PPU::new(memory.clone(), interrupt_controller.clone());
 
     let event_loop = EventLoop::new();
