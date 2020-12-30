@@ -22,6 +22,12 @@ impl From<Register8> for Source8bits {
     }
 }
 
+impl From<Register16> for Source8bits {
+    fn from(reg: Register16) -> Self {
+        Source8bits::Indirect(reg)
+    }
+}
+
 impl From<u8> for Source8bits {
     fn from(literal: u8) -> Self {
         Source8bits::Literal(literal)

@@ -82,6 +82,9 @@ pub enum Instruction {
     SubAWithLiteral {
         literal: u8,
     },
+    SubAWithIndirect {
+        addr: Register16,
+    },
     DAA,
     ComplementA,
     WriteReg8ValueAtAddress {
@@ -306,6 +309,9 @@ impl fmt::Display for Instruction {
             Instruction::SubAWithLiteral { literal } => {
                 write!(f, "SUB A, ${:02x}", literal)
             }
+            Instruction::SubAWithIndirect { addr } => {
+                write!(f, "SUB A, ({})", addr)
+            }
             Instruction::DAA => write!(f, "DAA"),
             Instruction::ComplementA => write!(f, "CPL"),
             Instruction::WriteReg8ValueAtAddress { addr, reg } => {
@@ -488,12 +494,9 @@ impl Instruction {
                 ]
             }
             Instruction::OrAWithReg8 { reg } => vec![MicroOp::OrA { rhs: reg.into() }],
-            Instruction::OrAWithIndirect { addr } => vec![
-                MicroOp::NOP,
-                MicroOp::OrA {
-                    rhs: Source8bits::Indirect(addr),
-                },
-            ],
+            Instruction::OrAWithIndirect { addr } => {
+                vec![MicroOp::NOP, MicroOp::OrA { rhs: addr.into() }]
+            }
             Instruction::OrAWithLiteral { literal } => vec![
                 MicroOp::NOP,
                 MicroOp::OrA {
@@ -504,12 +507,7 @@ impl Instruction {
                 vec![MicroOp::XorA { rhs: reg.into() }]
             }
             Instruction::XorAWithIndirect { addr } => {
-                vec![
-                    MicroOp::NOP,
-                    MicroOp::XorA {
-                        rhs: Source8bits::Indirect(addr),
-                    },
-                ]
+                vec![MicroOp::NOP, MicroOp::XorA { rhs: addr.into() }]
             }
             Instruction::XorAWithLiteral { literal } => {
                 vec![
@@ -521,12 +519,7 @@ impl Instruction {
             }
             Instruction::AddAWithReg8 { reg } => vec![MicroOp::AddA { rhs: reg.into() }],
             Instruction::AddAWithIndirect { addr } => {
-                vec![
-                    MicroOp::NOP,
-                    MicroOp::AddA {
-                        rhs: Source8bits::Indirect(addr),
-                    },
-                ]
+                vec![MicroOp::NOP, MicroOp::AddA { rhs: addr.into() }]
             }
             Instruction::AddAWithLiteral { literal } => {
                 vec![
@@ -564,12 +557,7 @@ impl Instruction {
                 ]
             }
             Instruction::AdcAWithIndirect { addr } => {
-                vec![
-                    MicroOp::NOP,
-                    MicroOp::AdcA {
-                        rhs: Source8bits::Indirect(addr),
-                    },
-                ]
+                vec![MicroOp::NOP, MicroOp::AdcA { rhs: addr.into() }]
             }
             Instruction::SubAWithReg8 { reg } => {
                 vec![MicroOp::SubA { rhs: reg.into() }]
@@ -581,6 +569,9 @@ impl Instruction {
                         rhs: literal.into(),
                     },
                 ]
+            }
+            Instruction::SubAWithIndirect { addr } => {
+                vec![MicroOp::NOP, MicroOp::SubA { rhs: addr.into() }]
             }
             Instruction::DAA => vec![MicroOp::DAA],
             Instruction::ComplementA => vec![MicroOp::ComplementA],
