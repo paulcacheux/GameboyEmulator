@@ -1,4 +1,4 @@
-use log::{error, warn};
+use log::error;
 
 use super::MBC;
 
@@ -9,36 +9,26 @@ pub struct MBC1 {
     bank_index: usize,
     ram_index: usize,
     ram_enabled: bool,
-    banks: Vec<u8>,
-    rams: Vec<u8>,
+    rom: Vec<u8>,
+    ram: Vec<u8>,
 }
 
 impl MBC1 {
-    pub fn new(content: &[u8], rom_size: usize, ram_size_class: u8) -> Self {
+    pub fn new(content: &[u8], rom_size: usize, ram_size: usize) -> Self {
         assert_eq!(content.len() % BANK_SIZE, 0);
 
-        let mut banks: Vec<u8> = content.iter().copied().collect();
-        banks.resize(rom_size as usize, 0);
+        let mut rom: Vec<u8> = content.iter().copied().collect();
+        rom.resize(rom_size as usize, 0);
 
-        let rams = match ram_size_class {
-            0x00 => Vec::new(),
-            0x01 => vec![0; 1 << 11],
-            0x02 => vec![0; 1 << 13],
-            0x03 => vec![0; 1 << 15],
-            0x04 => vec![0; 1 << 17],
-            0x05 => vec![0; 1 << 16],
-            _ => panic!("Unknown RAM Size"),
-        };
-
-        warn!("{:#x} {:#x}", banks.len(), rams.len());
+        let ram = vec![0; ram_size];
 
         MBC1 {
             bank_count: content.len() / BANK_SIZE,
             bank_index: 1,
             ram_index: 0,
             ram_enabled: false,
-            banks,
-            rams,
+            rom,
+            ram,
         }
     }
 }
@@ -46,11 +36,11 @@ impl MBC1 {
 impl MBC for MBC1 {
     fn read_memory(&self, addr: u16) -> u8 {
         match addr {
-            0x0000..=0x3FFF => self.banks[addr as usize],
-            0x4000..=0x7FFF => self.banks[self.bank_index * BANK_SIZE + (addr as usize - 0x4000)],
+            0x0000..=0x3FFF => self.rom[addr as usize],
+            0x4000..=0x7FFF => self.rom[self.bank_index * BANK_SIZE + (addr as usize - 0x4000)],
             0xA000..=0xBFFF => {
                 if self.ram_enabled {
-                    self.rams[self.ram_index * BANK_SIZE + (addr as usize - 0xA000)]
+                    self.ram[self.ram_index * BANK_SIZE + (addr as usize - 0xA000)]
                 } else {
                     error!("Read from ram with ram disabled");
                     0xFF
@@ -88,7 +78,7 @@ impl MBC for MBC1 {
             }
             0xA000..=0xBFFF => {
                 if self.ram_enabled {
-                    self.rams[self.ram_index * BANK_SIZE + (addr as usize - 0xA000)] = value;
+                    self.ram[self.ram_index * BANK_SIZE + (addr as usize - 0xA000)] = value;
                 } else {
                     error!("Write to ram with ram disabled");
                 }

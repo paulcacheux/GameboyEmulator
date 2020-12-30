@@ -1,9 +1,11 @@
 use std::{rc::Rc, sync::RwLock};
 
-use log::{debug, error};
+use log::debug;
 
 mod mbc1;
-pub use mbc1::MBC1;
+mod simple;
+use mbc1::MBC1;
+use simple::Simple as SimpleMBC;
 
 pub struct MMU {
     bootstrap_rom: Box<[u8; 0x100]>,
@@ -123,33 +125,28 @@ pub trait MBC {
     fn write_memory(&mut self, addr: u16, value: u8);
 }
 
-pub struct ROMOnly {
-    rom: Box<[u8; 0x8000]>,
-}
+pub fn build_mbc(content: &[u8]) -> Box<dyn MBC> {
+    const CARTRIDGE_TYPE_ADDR: usize = 0x0147;
+    const CARTRIDGE_ROM_SIZE_ADDR: usize = 0x0148;
+    const CARTRIDGE_RAM_SIZE_ADDR: usize = 0x0149;
 
-impl ROMOnly {
-    pub fn new(content: &[u8]) -> Self {
-        assert!(content.len() <= 0x8000);
-        let mut mbc = ROMOnly {
-            rom: Box::new([0; 0x8000]),
-        };
-        mbc.rom[..content.len()].copy_from_slice(content);
-        mbc
-    }
-}
+    let rom_size = (1 << 15) << content[CARTRIDGE_ROM_SIZE_ADDR];
+    assert_eq!(rom_size, content.len());
 
-impl MBC for ROMOnly {
-    fn read_memory(&self, addr: u16) -> u8 {
-        match addr {
-            0x0100..=0x7FFF => self.rom[addr as usize],
-            _ => {
-                debug!("Read from uncontrolled MBC space");
-                0xFF
-            }
-        }
-    }
+    let ram_size = match content[CARTRIDGE_RAM_SIZE_ADDR] {
+        0x00 => 0,
+        0x01 => 11,
+        0x02 => 13,
+        0x03 => 15,
+        0x04 => 17,
+        0x05 => 16,
+        _ => panic!("Unknown RAM Size"),
+    };
 
-    fn write_memory(&mut self, _addr: u16, _value: u8) {
-        error!("Write to ROM error")
+    match content[CARTRIDGE_TYPE_ADDR] {
+        0x00 => Box::new(SimpleMBC::new(content)),
+        0x01 => Box::new(MBC1::new(content, rom_size, 0)),
+        0x02 | 0x03 => Box::new(MBC1::new(content, rom_size, ram_size)),
+        _ => unimplemented!(),
     }
 }
