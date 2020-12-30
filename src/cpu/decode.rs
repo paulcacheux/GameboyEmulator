@@ -1,5 +1,6 @@
 use super::{
     instruction::{Instruction, JumpCondition, PrePostOperation},
+    micro_op::Reg8OrIndirect,
     register::{Register16, Register8},
     CPU,
 };
@@ -635,237 +636,9 @@ pub fn decode_instruction<M: Memory>(cpu: &mut CPU<M>) -> Instruction {
                 0x3D => Instruction::ShiftRightWithZeroIntoCarry { reg: Register8::L },
                 0x3F => Instruction::ShiftRightWithZeroIntoCarry { reg: Register8::A },
 
-                0x40 => Instruction::BitTest {
-                    reg: Register8::B,
-                    bit: 0,
-                },
-                0x41 => Instruction::BitTest {
-                    reg: Register8::C,
-                    bit: 0,
-                },
-                0x42 => Instruction::BitTest {
-                    reg: Register8::D,
-                    bit: 0,
-                },
-                0x43 => Instruction::BitTest {
-                    reg: Register8::E,
-                    bit: 0,
-                },
-                0x44 => Instruction::BitTest {
-                    reg: Register8::H,
-                    bit: 0,
-                },
-                0x45 => Instruction::BitTest {
-                    reg: Register8::L,
-                    bit: 0,
-                },
-                0x47 => Instruction::BitTest {
-                    reg: Register8::A,
-                    bit: 0,
-                },
-
-                0x48 => Instruction::BitTest {
-                    reg: Register8::B,
-                    bit: 1,
-                },
-                0x49 => Instruction::BitTest {
-                    reg: Register8::C,
-                    bit: 1,
-                },
-                0x4A => Instruction::BitTest {
-                    reg: Register8::D,
-                    bit: 1,
-                },
-                0x4B => Instruction::BitTest {
-                    reg: Register8::E,
-                    bit: 1,
-                },
-                0x4C => Instruction::BitTest {
-                    reg: Register8::H,
-                    bit: 1,
-                },
-                0x4D => Instruction::BitTest {
-                    reg: Register8::L,
-                    bit: 1,
-                },
-                0x4F => Instruction::BitTest {
-                    reg: Register8::A,
-                    bit: 1,
-                },
-
-                0x50 => Instruction::BitTest {
-                    reg: Register8::B,
-                    bit: 2,
-                },
-                0x51 => Instruction::BitTest {
-                    reg: Register8::C,
-                    bit: 2,
-                },
-                0x52 => Instruction::BitTest {
-                    reg: Register8::D,
-                    bit: 2,
-                },
-                0x53 => Instruction::BitTest {
-                    reg: Register8::E,
-                    bit: 2,
-                },
-                0x54 => Instruction::BitTest {
-                    reg: Register8::H,
-                    bit: 2,
-                },
-                0x55 => Instruction::BitTest {
-                    reg: Register8::L,
-                    bit: 2,
-                },
-                0x57 => Instruction::BitTest {
-                    reg: Register8::A,
-                    bit: 2,
-                },
-
-                0x58 => Instruction::BitTest {
-                    reg: Register8::B,
-                    bit: 3,
-                },
-                0x59 => Instruction::BitTest {
-                    reg: Register8::C,
-                    bit: 3,
-                },
-                0x5A => Instruction::BitTest {
-                    reg: Register8::D,
-                    bit: 3,
-                },
-                0x5B => Instruction::BitTest {
-                    reg: Register8::E,
-                    bit: 3,
-                },
-                0x5C => Instruction::BitTest {
-                    reg: Register8::H,
-                    bit: 3,
-                },
-                0x5D => Instruction::BitTest {
-                    reg: Register8::L,
-                    bit: 3,
-                },
-                0x5F => Instruction::BitTest {
-                    reg: Register8::A,
-                    bit: 3,
-                },
-
-                0x60 => Instruction::BitTest {
-                    reg: Register8::B,
-                    bit: 4,
-                },
-                0x61 => Instruction::BitTest {
-                    reg: Register8::C,
-                    bit: 4,
-                },
-                0x62 => Instruction::BitTest {
-                    reg: Register8::D,
-                    bit: 4,
-                },
-                0x63 => Instruction::BitTest {
-                    reg: Register8::E,
-                    bit: 4,
-                },
-                0x64 => Instruction::BitTest {
-                    reg: Register8::H,
-                    bit: 4,
-                },
-                0x65 => Instruction::BitTest {
-                    reg: Register8::L,
-                    bit: 4,
-                },
-                0x67 => Instruction::BitTest {
-                    reg: Register8::A,
-                    bit: 4,
-                },
-
-                0x68 => Instruction::BitTest {
-                    reg: Register8::B,
-                    bit: 5,
-                },
-                0x69 => Instruction::BitTest {
-                    reg: Register8::C,
-                    bit: 5,
-                },
-                0x6A => Instruction::BitTest {
-                    reg: Register8::D,
-                    bit: 5,
-                },
-                0x6B => Instruction::BitTest {
-                    reg: Register8::E,
-                    bit: 5,
-                },
-                0x6C => Instruction::BitTest {
-                    reg: Register8::H,
-                    bit: 5,
-                },
-                0x6D => Instruction::BitTest {
-                    reg: Register8::L,
-                    bit: 5,
-                },
-                0x6F => Instruction::BitTest {
-                    reg: Register8::A,
-                    bit: 5,
-                },
-
-                0x70 => Instruction::BitTest {
-                    reg: Register8::B,
-                    bit: 6,
-                },
-                0x71 => Instruction::BitTest {
-                    reg: Register8::C,
-                    bit: 6,
-                },
-                0x72 => Instruction::BitTest {
-                    reg: Register8::D,
-                    bit: 6,
-                },
-                0x73 => Instruction::BitTest {
-                    reg: Register8::E,
-                    bit: 6,
-                },
-                0x74 => Instruction::BitTest {
-                    reg: Register8::H,
-                    bit: 6,
-                },
-                0x75 => Instruction::BitTest {
-                    reg: Register8::L,
-                    bit: 6,
-                },
-                0x77 => Instruction::BitTest {
-                    reg: Register8::A,
-                    bit: 6,
-                },
-
-                0x78 => Instruction::BitTest {
-                    reg: Register8::B,
-                    bit: 7,
-                },
-                0x79 => Instruction::BitTest {
-                    reg: Register8::C,
-                    bit: 7,
-                },
-                0x7A => Instruction::BitTest {
-                    reg: Register8::D,
-                    bit: 7,
-                },
-                0x7B => Instruction::BitTest {
-                    reg: Register8::E,
-                    bit: 7,
-                },
-                0x7C => Instruction::BitTest {
-                    reg: Register8::H,
-                    bit: 7,
-                },
-                0x7D => Instruction::BitTest {
-                    reg: Register8::L,
-                    bit: 7,
-                },
-                0x7F => Instruction::BitTest {
-                    reg: Register8::A,
-                    bit: 7,
-                },
+                opcode @ 0x40..=0x7F => decode_bit_test(opcode),
+                opcode @ 0x80..=0xBF => decode_reset_bit(opcode),
+                opcode @ 0xC0..=0xFF => decode_set_bit(opcode),
 
                 other => panic!("Unknown sub-opcode (prefix 0xCB) {:#x}", other),
             }
@@ -1001,5 +774,91 @@ pub fn decode_instruction<M: Memory>(cpu: &mut CPU<M>) -> Instruction {
         },
         0xFF => Instruction::Reset { offset: 0x38 },
         _ => panic!("Unknown opcode {:#x} at {:#x}", opcode, pc),
+    }
+}
+
+fn decode_reg_bit_ops(reg_opcode: u8) -> (Reg8OrIndirect, u8) {
+    match reg_opcode {
+        0x0 => (Register8::B.into(), 0),
+        0x1 => (Register8::C.into(), 0),
+        0x2 => (Register8::D.into(), 0),
+        0x3 => (Register8::E.into(), 0),
+        0x4 => (Register8::H.into(), 0),
+        0x5 => (Register8::L.into(), 0),
+        0x6 => (Register16::HL.into(), 0),
+        0x7 => (Register8::A.into(), 0),
+
+        0x8 => (Register8::B.into(), 1),
+        0x9 => (Register8::C.into(), 1),
+        0xA => (Register8::D.into(), 1),
+        0xB => (Register8::E.into(), 1),
+        0xC => (Register8::H.into(), 1),
+        0xD => (Register8::L.into(), 1),
+        0xE => (Register16::HL.into(), 1),
+        0xF => (Register8::A.into(), 1),
+        _ => unreachable!(),
+    }
+}
+
+fn decode_bit_test(opcode: u8) -> Instruction {
+    let bit_opcode = opcode >> 4;
+    let reg_opcode = opcode & 0xF;
+
+    let (reg, offset) = decode_reg_bit_ops(reg_opcode);
+    let bit = match bit_opcode {
+        0x4 => 0,
+        0x5 => 2,
+        0x6 => 4,
+        0x7 => 6,
+        _ => unimplemented!(),
+    } + offset;
+
+    match reg {
+        Reg8OrIndirect::Reg8(reg) => Instruction::BitTest { reg, bit },
+        Reg8OrIndirect::Indirect(_) => {
+            unimplemented!()
+        }
+    }
+}
+
+fn decode_reset_bit(opcode: u8) -> Instruction {
+    let bit_opcode = opcode >> 4;
+    let reg_opcode = opcode & 0xF;
+
+    let (reg, offset) = decode_reg_bit_ops(reg_opcode);
+    let bit = match bit_opcode {
+        0x8 => 0,
+        0x9 => 2,
+        0xA => 4,
+        0xB => 6,
+        _ => unimplemented!(),
+    } + offset;
+
+    match reg {
+        Reg8OrIndirect::Reg8(reg) => Instruction::ResetBit { reg, bit },
+        Reg8OrIndirect::Indirect(_) => {
+            unimplemented!()
+        }
+    }
+}
+
+fn decode_set_bit(opcode: u8) -> Instruction {
+    let bit_opcode = opcode >> 4;
+    let reg_opcode = opcode & 0xF;
+
+    let (reg, offset) = decode_reg_bit_ops(reg_opcode);
+    let bit = match bit_opcode {
+        0xC => 0,
+        0xD => 2,
+        0xE => 4,
+        0xF => 6,
+        _ => unimplemented!(),
+    } + offset;
+
+    match reg {
+        Reg8OrIndirect::Reg8(reg) => Instruction::SetBit { reg, bit },
+        Reg8OrIndirect::Indirect(_) => {
+            unimplemented!()
+        }
     }
 }

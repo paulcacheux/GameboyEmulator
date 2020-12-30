@@ -362,9 +362,19 @@ impl<M: Memory> CPU<M> {
                     self.run_pre_post_op(addr, post_op);
                 }
                 MicroOp::BitTest { reg, bit } => {
-                    let is_set = (self.load_reg8(reg) >> bit) & 1 == 1;
+                    let is_set = (self.load_reg8_or_indirect(reg) >> bit) & 1 == 1;
                     let rest = Flags::HALF_CARRY | (self.flags & Flags::CARRY);
                     self.flags = if is_set { rest } else { Flags::ZERO | rest };
+                }
+                MicroOp::ResetBit { reg, bit } => {
+                    let value = self.load_reg8_or_indirect(reg);
+                    let res = value & !(1 << bit);
+                    self.store_reg8_or_indirect(reg, res);
+                }
+                MicroOp::SetBit { reg, bit } => {
+                    let value = self.load_reg8_or_indirect(reg);
+                    let res = value | (1 << bit);
+                    self.store_reg8_or_indirect(reg, res);
                 }
                 MicroOp::CheckFlags {
                     condition,

@@ -115,7 +115,15 @@ pub enum MicroOp {
         post_op: Option<PrePostOperation>,
     },
     BitTest {
-        reg: Register8,
+        reg: Reg8OrIndirect,
+        bit: u8,
+    },
+    ResetBit {
+        reg: Reg8OrIndirect,
+        bit: u8,
+    },
+    SetBit {
+        reg: Reg8OrIndirect,
         bit: u8,
     },
     IncReg16 {

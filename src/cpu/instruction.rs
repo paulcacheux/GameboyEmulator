@@ -151,6 +151,14 @@ pub enum Instruction {
         reg: Register8,
         bit: u8,
     },
+    ResetBit {
+        reg: Register8,
+        bit: u8,
+    },
+    SetBit {
+        reg: Register8,
+        bit: u8,
+    },
     CallAddr {
         condition: Option<JumpCondition>,
         addr: u16,
@@ -414,6 +422,8 @@ impl fmt::Display for Instruction {
                 write!(f, "POP {}", reg)
             }
             Instruction::BitTest { reg, bit } => write!(f, "BIT {}, {}", bit, reg),
+            Instruction::ResetBit { reg, bit } => write!(f, "RES {}, {}", bit, reg),
+            Instruction::SetBit { reg, bit } => write!(f, "SET {}, {}", bit, reg),
             Instruction::CallAddr { condition, addr } => {
                 if let Some(cond) = condition {
                     write!(f, "CALL {}, ${:04x}", cond, addr)
@@ -782,7 +792,27 @@ impl Instruction {
                     post_op: Some(PrePostOperation::Inc),
                 },
             ],
-            Instruction::BitTest { reg, bit } => vec![MicroOp::NOP, MicroOp::BitTest { reg, bit }],
+            Instruction::BitTest { reg, bit } => vec![
+                MicroOp::NOP,
+                MicroOp::BitTest {
+                    reg: reg.into(),
+                    bit,
+                },
+            ],
+            Instruction::ResetBit { reg, bit } => vec![
+                MicroOp::NOP,
+                MicroOp::ResetBit {
+                    reg: reg.into(),
+                    bit,
+                },
+            ],
+            Instruction::SetBit { reg, bit } => vec![
+                MicroOp::NOP,
+                MicroOp::SetBit {
+                    reg: reg.into(),
+                    bit,
+                },
+            ],
             Instruction::CallAddr { condition, addr } => {
                 if let Some(cond) = condition {
                     //
