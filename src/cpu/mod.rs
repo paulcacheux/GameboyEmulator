@@ -592,6 +592,10 @@ impl<M: Memory> CPU<M> {
             0xE6 => Instruction::AndAWithLiteral {
                 literal: self.fetch_and_advance(),
             },
+            0xE8 => Instruction::AddOffsetToReg16 {
+                reg: Register16::SP,
+                offset: self.fetch_and_advance() as i8,
+            },
             0xE9 => Instruction::JumpRegister16 {
                 reg: Register16::HL,
             },
@@ -612,6 +616,11 @@ impl<M: Memory> CPU<M> {
             0xF3 => Instruction::DisableInterrupts,
             0xF5 => Instruction::PushReg16 {
                 reg: Register16::AF,
+            },
+            0xF8 => Instruction::LoadAddressOffsetIntoReg16 {
+                dest: Register16::HL,
+                base: Register16::SP,
+                offset: self.fetch_and_advance() as i8,
             },
             0xF9 => Instruction::Move16Bits {
                 dest: Register16::SP,
@@ -725,7 +734,7 @@ impl<M: Memory> CPU<M> {
                     let rhs_value = self.load_reg16(rhs);
 
                     let (res, carry) = hl_value.overflowing_add(rhs_value);
-                    let half_carry = check_half_carry_16bits(hl_value, rhs_value);
+                    let half_carry = check_half_carry_16bits_high(hl_value, rhs_value);
 
                     self.store_reg16(Register16::HL, res);
 
@@ -844,11 +853,40 @@ impl<M: Memory> CPU<M> {
                         self.pipeline.push_front(op);
                     }
                 }
-                MicroOp::RelativeJump(offset) => {
-                    if offset < 0 {
-                        self.pc = self.pc.wrapping_sub((-offset) as u16);
+                MicroOp::AddOffsetToReg16IntoReg16 {
+                    dest,
+                    rhs,
+                    offset,
+                    update_flags,
+                } => {
+                    let value = self.load_reg16(rhs);
+                    let (res, carry, half_carry) = if offset < 0 {
+                        let neg_offset = (-offset) as u16;
+                        (
+                            value.wrapping_sub(neg_offset),
+                            check_half_carry_sub_16bits_mid(value, neg_offset),
+                            check_half_carry_sub_16bits_low(value, neg_offset),
+                        )
                     } else {
-                        self.pc = self.pc.wrapping_add(offset as u16);
+                        let offset = offset as u16;
+                        (
+                            value.wrapping_add(offset),
+                            check_half_carry_16bits_mid(value, offset),
+                            check_half_carry_16bits_low(value, offset),
+                        )
+                    };
+                    self.store_reg16(dest, res);
+
+                    if update_flags {
+                        self.flags = Flags::empty();
+
+                        if carry {
+                            self.flags |= Flags::CARRY;
+                        }
+
+                        if half_carry {
+                            self.flags |= Flags::HALF_CARRY;
+                        }
                     }
                 }
                 MicroOp::IncReg16 { reg } => {
@@ -1013,11 +1051,28 @@ fn check_half_carry(a: u8, b: u8) -> bool {
     (((a & 0xf) + (b & 0xf)) & 0x10) == 0x10
 }
 
-fn check_half_carry_16bits(a: u16, b: u16) -> bool {
+fn check_half_carry_16bits_high(a: u16, b: u16) -> bool {
+    (((a & 0xFFF) + (b & 0xFFF)) & 0x1000) == 0x1000
+}
+
+fn check_half_carry_16bits_mid(a: u16, b: u16) -> bool {
     (((a & 0xFF) + (b & 0xFF)) & 0x100) == 0x100
+}
+
+fn check_half_carry_16bits_low(a: u16, b: u16) -> bool {
+    check_half_carry(a as u8, b as u8)
 }
 
 fn check_half_carry_sub(a: u8, b: u8) -> bool {
     let neg_b = u8::MAX.wrapping_sub(b).wrapping_add(1);
     check_half_carry(a, neg_b)
+}
+
+fn check_half_carry_sub_16bits_low(a: u16, b: u16) -> bool {
+    check_half_carry_sub(a as u8, b as u8)
+}
+
+fn check_half_carry_sub_16bits_mid(a: u16, b: u16) -> bool {
+    let neg_b = u16::MAX.wrapping_sub(b).wrapping_add(1);
+    check_half_carry_16bits_mid(a, neg_b)
 }

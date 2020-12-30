@@ -22,6 +22,11 @@ pub enum Instruction {
         reg: Register16,
         literal: u16,
     },
+    LoadAddressOffsetIntoReg16 {
+        dest: Register16,
+        base: Register16,
+        offset: i8,
+    },
     AndAWithReg8 {
         reg: Register8,
     },
@@ -51,6 +56,10 @@ pub enum Instruction {
     },
     AddHLWithReg {
         reg: Register16,
+    },
+    AddOffsetToReg16 {
+        reg: Register16,
+        offset: i8,
     },
     AdcAWithLiteral {
         literal: u8,
@@ -223,6 +232,9 @@ impl fmt::Display for Instruction {
             Instruction::LoadLiteralIntoReg16 { reg, literal } => {
                 write!(f, "LD {}, ${:04x}", reg, literal)
             }
+            Instruction::LoadAddressOffsetIntoReg16 { dest, base, offset } => {
+                write!(f, "LD {}, {}+{}", dest, base, offset)
+            }
             Instruction::AndAWithReg8 { reg } => {
                 write!(f, "AND A, {}", reg)
             }
@@ -252,6 +264,9 @@ impl fmt::Display for Instruction {
             }
             Instruction::AddHLWithReg { reg } => {
                 write!(f, "ADD HL, {}", reg)
+            }
+            Instruction::AddOffsetToReg16 { reg, offset } => {
+                write!(f, "ADD {}, {}", reg, offset) // check format for offset
             }
             Instruction::AdcAWithLiteral { literal } => {
                 write!(f, "ADC A, ${:02x}", literal)
@@ -417,6 +432,18 @@ impl Instruction {
                     simpl::load_literal_into_reg8((literal >> 8) as u8, reg.higher_half()),
                 ]
             }
+            Instruction::LoadAddressOffsetIntoReg16 { dest, base, offset } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::AddOffsetToReg16IntoReg16 {
+                        dest,
+                        rhs: base,
+                        offset,
+                        update_flags: true,
+                    },
+                ]
+            }
             Instruction::AndAWithReg8 { reg } => vec![MicroOp::AndA { rhs: reg.into() }],
             Instruction::AndAWithLiteral { literal } => {
                 vec![
@@ -470,6 +497,19 @@ impl Instruction {
             }
             Instruction::AddHLWithReg { reg } => {
                 vec![MicroOp::NOP, MicroOp::AddHL { rhs: reg }]
+            }
+            Instruction::AddOffsetToReg16 { reg, offset } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::AddOffsetToReg16IntoReg16 {
+                        dest: reg,
+                        rhs: reg,
+                        offset,
+                        update_flags: true,
+                    },
+                ]
             }
             Instruction::AdcAWithLiteral { literal } => {
                 vec![
@@ -703,12 +743,12 @@ impl Instruction {
                         MicroOp::NOP,
                         MicroOp::CheckFlags {
                             condition: cond,
-                            true_ops: vec![MicroOp::RelativeJump(offset)],
+                            true_ops: vec![simpl::jump_relative(offset)],
                             false_ops: vec![],
                         },
                     ]
                 } else {
-                    vec![MicroOp::NOP, MicroOp::RelativeJump(offset)]
+                    vec![MicroOp::NOP, simpl::jump_relative(offset)]
                 }
             }
             Instruction::JumpAbsolute { condition, addr } => {

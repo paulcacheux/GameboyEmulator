@@ -58,6 +58,12 @@ pub enum MicroOp {
     AddHL {
         rhs: Register16,
     },
+    AddOffsetToReg16IntoReg16 {
+        dest: Register16,
+        rhs: Register16,
+        offset: i8,
+        update_flags: bool,
+    },
     AdcA {
         rhs: Source8bits,
     },
@@ -122,7 +128,6 @@ pub enum MicroOp {
         true_ops: Vec<MicroOp>,
         false_ops: Vec<MicroOp>,
     },
-    RelativeJump(i8),
     EnableInterrupts,
     DisableInterrupts,
 }
@@ -141,6 +146,15 @@ pub mod simpl {
         MicroOp::Move8Bits {
             destination: Destination8Bits::Register(destination),
             source: Source8bits::Register(src),
+        }
+    }
+
+    pub fn jump_relative(offset: i8) -> MicroOp {
+        MicroOp::AddOffsetToReg16IntoReg16 {
+            dest: Register16::PC,
+            rhs: Register16::PC,
+            offset,
+            update_flags: false,
         }
     }
 }
