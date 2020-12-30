@@ -33,6 +33,9 @@ pub enum Instruction {
     AndAWithLiteral {
         literal: u8,
     },
+    AndAWithIndirect {
+        addr: Register16,
+    },
     OrAWithReg8 {
         reg: Register8,
     },
@@ -269,6 +272,9 @@ impl fmt::Display for Instruction {
             }
             Instruction::AndAWithLiteral { literal } => {
                 write!(f, "AND A, ${:02x}", literal)
+            }
+            Instruction::AndAWithIndirect { addr } => {
+                write!(f, "AND A, ({})", addr)
             }
             Instruction::OrAWithReg8 { reg } => {
                 write!(f, "OR A, {}", reg)
@@ -510,6 +516,9 @@ impl Instruction {
                         rhs: literal.into(),
                     },
                 ]
+            }
+            Instruction::AndAWithIndirect { addr } => {
+                vec![MicroOp::NOP, MicroOp::AndA { rhs: addr.into() }]
             }
             Instruction::OrAWithReg8 { reg } => vec![MicroOp::OrA { rhs: reg.into() }],
             Instruction::OrAWithIndirect { addr } => {

@@ -642,7 +642,9 @@ impl<M: Memory> CPU<M> {
             0xA3 => Instruction::AndAWithReg8 { reg: Register8::E },
             0xA4 => Instruction::AndAWithReg8 { reg: Register8::H },
             0xA5 => Instruction::AndAWithReg8 { reg: Register8::L },
-
+            0xA6 => Instruction::AndAWithIndirect {
+                addr: Register16::HL,
+            },
             0xA7 => Instruction::AndAWithReg8 { reg: Register8::A },
             0xA8 => Instruction::XorAWithReg8 { reg: Register8::B },
             0xA9 => Instruction::XorAWithReg8 { reg: Register8::C },
