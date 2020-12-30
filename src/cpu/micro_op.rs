@@ -91,6 +91,9 @@ pub enum MicroOp {
     IncReg {
         reg: Register8,
     },
+    DecReg16 {
+        reg: Register16,
+    },
     DecReg {
         reg: Register8,
     },

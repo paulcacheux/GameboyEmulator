@@ -135,6 +135,9 @@ pub enum Instruction {
     IncReg8 {
         reg: Register8,
     },
+    DecReg16 {
+        reg: Register16,
+    },
     DecReg8 {
         reg: Register8,
     },
@@ -347,6 +350,9 @@ impl fmt::Display for Instruction {
             }
             Instruction::IncReg8 { reg } => {
                 write!(f, "INC {}", reg)
+            }
+            Instruction::DecReg16 { reg } => {
+                write!(f, "DEC {}", reg)
             }
             Instruction::DecReg8 { reg } => {
                 write!(f, "DEC {}", reg)
@@ -733,6 +739,7 @@ impl Instruction {
             }],
             Instruction::IncReg16 { reg } => vec![MicroOp::NOP, MicroOp::IncReg16 { reg }],
             Instruction::IncReg8 { reg } => vec![MicroOp::IncReg { reg }],
+            Instruction::DecReg16 { reg } => vec![MicroOp::NOP, MicroOp::DecReg16 { reg }],
             Instruction::DecReg8 { reg } => vec![MicroOp::DecReg { reg }],
             Instruction::DecIndirect { addr } => {
                 vec![MicroOp::NOP, MicroOp::NOP, MicroOp::DecIndirect { addr }]
