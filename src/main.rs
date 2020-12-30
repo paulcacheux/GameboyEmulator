@@ -4,6 +4,7 @@ use std::{
 };
 
 use interrupt::InterruptController;
+use memory::{ROMOnly, MBC, MBC1};
 use pixels::{Pixels, SurfaceTexture};
 use winit::{
     dpi::LogicalSize,
@@ -49,8 +50,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => panic!("Incorrect arguments"),
     };
 
-    let mut mmu = memory::MMU::new();
-    mmu.write_rom(&rom);
+    let mbc = build_mbc(&rom);
+    let mut mmu = memory::MMU::new(mbc);
     if let Some(bootstrap) = &bootstrap {
         mmu.write_bootstrap_rom(bootstrap);
     } else {
@@ -122,4 +123,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             _ => {}
         }
     });
+}
+
+fn build_mbc(content: &[u8]) -> Box<dyn MBC> {
+    const CARTRIDGE_TYPE_ADDR: usize = 0x0147;
+    const CARTRIDGE_ROM_SIZE_ADDR: usize = 0x0148;
+    const CARTRIDGE_RAM_SIZE_ADDR: usize = 0x0149;
+
+    let rom_size = (1 << 15) << content[CARTRIDGE_ROM_SIZE_ADDR];
+    assert_eq!(rom_size, content.len());
+
+    match content[CARTRIDGE_TYPE_ADDR] {
+        0x00 => Box::new(ROMOnly::new(content)),
+        0x01 => Box::new(MBC1::new(content, rom_size, 0)),
+        0x02 | 0x03 => Box::new(MBC1::new(
+            content,
+            rom_size,
+            content[CARTRIDGE_RAM_SIZE_ADDR],
+        )),
+        _ => unimplemented!(),
+    }
 }

@@ -1,13 +1,14 @@
 use std::{rc::Rc, sync::RwLock};
 
-use log::debug;
+use log::{debug, error};
 
-#[derive(Debug, Clone)]
+mod mbc1;
+pub use mbc1::MBC1;
+
 pub struct MMU {
     bootstrap_rom: Box<[u8; 0x100]>,
-    rom: Box<[u8; 0x8000]>,
+    mbc: Box<dyn MBC>,
     vram: Box<[u8; 0x2000]>,
-    eram: Box<[u8; 0x2000]>,
     wram: Box<[u8; 0x2000]>,
     oam: Box<[u8; 0xA0]>,
     io_regs: Box<[u8; 0x80]>,
@@ -16,12 +17,11 @@ pub struct MMU {
 }
 
 impl MMU {
-    pub fn new() -> Self {
+    pub fn new(mbc: Box<dyn MBC>) -> Self {
         MMU {
             bootstrap_rom: Box::new([0; 0x100]),
-            rom: Box::new([0; 0x8000]),
+            mbc,
             vram: Box::new([0; 0x2000]),
-            eram: Box::new([0; 0x2000]),
             wram: Box::new([0; 0x2000]),
             oam: Box::new([0; 0xA0]),
             io_regs: Box::new([0; 0x80]),
@@ -30,27 +30,23 @@ impl MMU {
         }
     }
 
-    pub fn write_rom(&mut self, slice: &[u8]) {
-        self.rom[..slice.len()].copy_from_slice(slice);
-    }
-
     pub fn write_bootstrap_rom(&mut self, slice: &[u8]) {
         self.bootstrap_rom[..slice.len()].copy_from_slice(slice);
     }
 
-    pub fn mounted_rom(&self) -> &[u8] {
+    pub fn read_mounted_rom(&self, addr: u16) -> u8 {
         if self.read_memory(BOOTSTRAP_ROM_MOUNT_CONTROL_ADDR) != 0 {
-            self.rom.as_ref()
+            self.mbc.read_memory(addr)
         } else {
-            self.bootstrap_rom.as_ref()
+            self.bootstrap_rom[addr as usize]
         }
     }
 
-    pub fn mounted_rom_mut(&mut self) -> &mut [u8] {
+    pub fn write_mounted_rom(&mut self, addr: u16, value: u8) {
         if self.read_memory(BOOTSTRAP_ROM_MOUNT_CONTROL_ADDR) != 0 {
-            self.rom.as_mut()
+            self.mbc.write_memory(addr, value);
         } else {
-            self.bootstrap_rom.as_mut()
+            self.bootstrap_rom[addr as usize] = value;
         }
     }
 
@@ -66,10 +62,10 @@ const BOOTSTRAP_ROM_MOUNT_CONTROL_ADDR: u16 = 0xFF50;
 impl Memory for MMU {
     fn read_memory(&self, addr: u16) -> u8 {
         match addr {
-            0x0000..=0x00FF => self.mounted_rom()[addr as usize],
-            0x0100..=0x7FFF => self.rom[addr as usize],
+            0x0000..=0x00FF => self.read_mounted_rom(addr),
+            0x0100..=0x7FFF => self.mbc.read_memory(addr),
             0x8000..=0x9FFF => self.vram[addr as usize - 0x8000],
-            0xA000..=0xBFFF => self.eram[addr as usize - 0xA000],
+            0xA000..=0xBFFF => self.mbc.read_memory(addr),
             0xC000..=0xDFFF => self.wram[addr as usize - 0xC000],
             0xE000..=0xFDFF => self.wram[addr as usize - 0xE000],
             0xFE00..=0xFE9F => self.oam[addr as usize - 0xFE00],
@@ -90,10 +86,10 @@ impl Memory for MMU {
         }
 
         match addr {
-            0x0000..=0x00FF => self.mounted_rom_mut()[addr as usize] = value,
-            0x0100..=0x7FFF => self.rom[addr as usize] = value,
+            0x0000..=0x00FF => self.write_mounted_rom(addr, value),
+            0x0100..=0x7FFF => self.mbc.write_memory(addr, value),
             0x8000..=0x9FFF => self.vram[addr as usize - 0x8000] = value,
-            0xA000..=0xBFFF => self.eram[addr as usize - 0xA000] = value,
+            0xA000..=0xBFFF => self.mbc.write_memory(addr, value),
             0xC000..=0xDFFF => self.wram[addr as usize - 0xC000] = value,
             0xE000..=0xFDFF => self.wram[addr as usize - 0xE000] = value,
             0xFE00..=0xFE9F => self.oam[addr as usize - 0xFE00] = value,
@@ -119,5 +115,41 @@ impl<M: Memory> Memory for Rc<RwLock<M>> {
 
     fn write_memory(&mut self, addr: u16, value: u8) {
         self.write().unwrap().write_memory(addr, value);
+    }
+}
+
+pub trait MBC {
+    fn read_memory(&self, addr: u16) -> u8;
+    fn write_memory(&mut self, addr: u16, value: u8);
+}
+
+pub struct ROMOnly {
+    rom: Box<[u8; 0x8000]>,
+}
+
+impl ROMOnly {
+    pub fn new(content: &[u8]) -> Self {
+        assert!(content.len() <= 0x8000);
+        let mut mbc = ROMOnly {
+            rom: Box::new([0; 0x8000]),
+        };
+        mbc.rom[..content.len()].copy_from_slice(content);
+        mbc
+    }
+}
+
+impl MBC for ROMOnly {
+    fn read_memory(&self, addr: u16) -> u8 {
+        match addr {
+            0x0100..=0x7FFF => self.rom[addr as usize],
+            _ => {
+                debug!("Read from uncontrolled MBC space");
+                0xFF
+            }
+        }
+    }
+
+    fn write_memory(&mut self, _addr: u16, _value: u8) {
+        error!("Write to ROM error")
     }
 }
