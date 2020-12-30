@@ -7,6 +7,8 @@ mod simple;
 use mbc1::MBC1;
 use simple::Simple as SimpleMBC;
 
+use crate::interrupt::{IntKind, InterruptControllerPtr};
+
 pub struct MMU {
     bootstrap_rom: Box<[u8; 0x100]>,
     mbc: Box<dyn MBC>,
@@ -15,11 +17,11 @@ pub struct MMU {
     oam: Box<[u8; 0xA0]>,
     io_regs: Box<[u8; 0x80]>,
     hram: Box<[u8; 0x7F]>,
-    ie_reg: u8,
+    interrupt_controller: InterruptControllerPtr,
 }
 
 impl MMU {
-    pub fn new(mbc: Box<dyn MBC>) -> Self {
+    pub fn new(mbc: Box<dyn MBC>, int_controller: InterruptControllerPtr) -> Self {
         MMU {
             bootstrap_rom: Box::new([0; 0x100]),
             mbc,
@@ -28,7 +30,7 @@ impl MMU {
             oam: Box::new([0; 0xA0]),
             io_regs: Box::new([0; 0x80]),
             hram: Box::new([0; 0x7F]),
-            ie_reg: 0,
+            interrupt_controller: int_controller,
         }
     }
 
@@ -55,11 +57,55 @@ impl MMU {
     pub fn unmount_bootstrap_rom(&mut self) {
         self.write_memory(BOOTSTRAP_ROM_MOUNT_CONTROL_ADDR, 1);
     }
+
+    pub fn read_io_reg(&self, addr: u16) -> u8 {
+        if addr == DIVIDER_REGISTER_ADDR {
+            self.interrupt_controller.lock().unwrap().divider_register
+        } else if addr == TIMER_COUNTER_ADDR {
+            self.interrupt_controller.lock().unwrap().timer_counter
+        } else if addr == TIMER_MODULO_ADDR {
+            self.interrupt_controller.lock().unwrap().timer_modulo
+        } else if addr == TIMER_CONTROL_ADDR {
+            self.interrupt_controller.lock().unwrap().timer_control
+        } else if addr == INTERRUPT_FLAG_ADDR {
+            self.interrupt_controller
+                .lock()
+                .unwrap()
+                .interrupt_flag
+                .bits()
+        } else {
+            self.io_regs[addr as usize - 0xFF00]
+        }
+    }
+
+    pub fn write_io_reg(&mut self, addr: u16, value: u8) {
+        if addr == DIVIDER_REGISTER_ADDR {
+            self.interrupt_controller.lock().unwrap().divider_register = 0;
+        } else if addr == TIMER_COUNTER_ADDR {
+            self.interrupt_controller.lock().unwrap().timer_counter = value;
+        } else if addr == TIMER_MODULO_ADDR {
+            self.interrupt_controller.lock().unwrap().timer_modulo = value;
+        } else if addr == TIMER_CONTROL_ADDR {
+            self.interrupt_controller.lock().unwrap().timer_control = value;
+        } else if addr == INTERRUPT_FLAG_ADDR {
+            self.interrupt_controller.lock().unwrap().interrupt_flag =
+                IntKind::from_bits_truncate(value);
+        } else {
+            self.io_regs[addr as usize - 0xFF00] = value;
+        }
+    }
 }
 
 const SERIAL_TRANSFER_DATA_ADDR: u16 = 0xFF01;
 const SERIAL_TRANSFER_CONTROL_ADDR: u16 = 0xFF02;
 const BOOTSTRAP_ROM_MOUNT_CONTROL_ADDR: u16 = 0xFF50;
+
+const DIVIDER_REGISTER_ADDR: u16 = 0xFF04;
+const TIMER_COUNTER_ADDR: u16 = 0xFF05;
+const TIMER_MODULO_ADDR: u16 = 0xFF06;
+const TIMER_CONTROL_ADDR: u16 = 0xFF07;
+
+const INTERRUPT_FLAG_ADDR: u16 = 0xFF0F;
 
 impl Memory for MMU {
     fn read_memory(&self, addr: u16) -> u8 {
@@ -75,9 +121,14 @@ impl Memory for MMU {
                 debug!("Unusable space {:#x}", addr);
                 0xFF
             }
-            0xFF00..=0xFF7F => self.io_regs[addr as usize - 0xFF00],
+            0xFF00..=0xFF7F => self.read_io_reg(addr),
             0xFF80..=0xFFFE => self.hram[addr as usize - 0xFF80],
-            0xFFFF => self.ie_reg,
+            0xFFFF => self
+                .interrupt_controller
+                .lock()
+                .unwrap()
+                .interrupt_enable
+                .bits(),
         }
     }
 
@@ -98,9 +149,12 @@ impl Memory for MMU {
             0xFEA0..=0xFEFF => {
                 debug!("Write to unusable space {:#x}", addr)
             }
-            0xFF00..=0xFF7F => self.io_regs[addr as usize - 0xFF00] = value,
+            0xFF00..=0xFF7F => self.write_io_reg(addr, value),
             0xFF80..=0xFFFE => self.hram[addr as usize - 0xFF80] = value,
-            0xFFFF => self.ie_reg = value,
+            0xFFFF => {
+                self.interrupt_controller.lock().unwrap().interrupt_enable =
+                    IntKind::from_bits_truncate(value)
+            }
         }
     }
 }

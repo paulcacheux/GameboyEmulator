@@ -183,7 +183,11 @@ impl<M: Memory> PPU<M> {
                 self.fetcher = None;
             }
             PPUState::HBlank => {}
-            PPUState::VBlankInit => self.interrupt_controller.lock().unwrap().request_redraw(),
+            PPUState::VBlankInit => self
+                .interrupt_controller
+                .lock()
+                .unwrap()
+                .trigger_vblank_int(),
             PPUState::VBlank => {}
         }
 

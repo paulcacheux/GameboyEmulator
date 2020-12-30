@@ -1,4 +1,8 @@
-use crate::{memory::Memory, utils::combine};
+use crate::{
+    interrupt::{IntKind, InterruptControllerPtr},
+    memory::Memory,
+    utils::combine,
+};
 use bitflags::bitflags;
 use std::collections::VecDeque;
 
@@ -8,7 +12,7 @@ mod micro_op;
 mod register;
 
 use instruction::{Instruction, JumpCondition};
-use log::{debug, info};
+use log::debug;
 use micro_op::{Destination8Bits, MicroOp, Reg8OrIndirect, Source8bits};
 use register::{Register16, Register8};
 
@@ -41,10 +45,11 @@ pub struct CPU<M: Memory> {
     pub pc: u16,
 
     pipeline: VecDeque<MicroOp>,
+    interrupt_controller: InterruptControllerPtr,
 }
 
 impl<M: Memory> CPU<M> {
-    pub fn new(memory: M) -> Self {
+    pub fn new(memory: M, interrupt_controller: InterruptControllerPtr) -> Self {
         CPU {
             memory,
             reg_a: 0,
@@ -58,6 +63,7 @@ impl<M: Memory> CPU<M> {
             pc: 0,
             flags: Flags::empty(),
             pipeline: VecDeque::new(),
+            interrupt_controller,
         }
     }
 
@@ -193,11 +199,60 @@ impl<M: Memory> CPU<M> {
         }
     }
 
+    fn handle_interrupts(&mut self) {
+        let mut controller = self.interrupt_controller.lock().unwrap();
+        if let Some(kind) = controller.is_interrupt_waiting() {
+            controller.interrupt_flag.remove(kind);
+            controller.master_enable = false;
+
+            let addr = match kind {
+                IntKind::VBLANK => 0x40,
+                IntKind::LCD_STAT => 0x48,
+                IntKind::TIMER => 0x50,
+                IntKind::SERIAL => 0x58,
+                IntKind::JOYPAD => 0x60,
+                _ => panic!("Failed to get interrupt handler address"),
+            };
+
+            let micro_ops = vec![
+                MicroOp::NOP,
+                MicroOp::NOP,
+                MicroOp::WriteMem {
+                    addr: Register16::SP,
+                    reg: Register8::PCHigh,
+                    pre_op: Some(PrePostOperation::Dec),
+                    post_op: None,
+                },
+                MicroOp::WriteMem {
+                    addr: Register16::SP,
+                    reg: Register8::PCLow,
+                    pre_op: Some(PrePostOperation::Dec),
+                    post_op: None,
+                },
+                MicroOp::LoadReg16Lit {
+                    reg: Register16::PC,
+                    literal: addr,
+                },
+            ];
+            self.pipeline.extend(micro_ops);
+        }
+    }
+
+    fn decode_next_instruction(&mut self) {
+        let instruction = self.fetch_and_decode();
+        debug!("{:#06x}: {}", self.pc, instruction);
+        self.pipeline.extend(instruction.to_micro_ops());
+    }
+
     pub fn step(&mut self) {
+        self.interrupt_controller.lock().unwrap().timer_step();
+
         if self.pipeline.is_empty() {
-            let instruction = self.fetch_and_decode();
-            debug!("{:#06x}: {}", self.pc, instruction);
-            self.pipeline.extend(instruction.to_micro_ops());
+            self.handle_interrupts();
+        }
+
+        if self.pipeline.is_empty() {
+            self.decode_next_instruction();
         }
 
         if let Some(micro_op) = self.pipeline.pop_front() {
@@ -586,10 +641,10 @@ impl<M: Memory> CPU<M> {
                     self.flags.toggle(Flags::CARRY);
                 }
                 MicroOp::EnableInterrupts => {
-                    info!("Enable interrupts")
+                    self.interrupt_controller.lock().unwrap().master_enable = true;
                 }
                 MicroOp::DisableInterrupts => {
-                    info!("Disable interrupts")
+                    self.interrupt_controller.lock().unwrap().master_enable = false;
                 }
             }
         }

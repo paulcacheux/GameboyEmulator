@@ -49,8 +49,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => panic!("Incorrect arguments"),
     };
 
+    let interrupt_controller = Rc::new(Mutex::new(InterruptController::new()));
+
     let mbc = memory::build_mbc(&rom);
-    let mut mmu = memory::MMU::new(mbc);
+    let mut mmu = memory::MMU::new(mbc, interrupt_controller.clone());
     if let Some(bootstrap) = &bootstrap {
         mmu.write_bootstrap_rom(bootstrap);
     } else {
@@ -59,8 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let memory = Rc::new(RwLock::new(mmu));
 
-    let interrupt_controller = Rc::new(Mutex::new(InterruptController::new()));
-    let mut cpu = CPU::new(memory.clone());
+    let mut cpu = CPU::new(memory.clone(), interrupt_controller.clone());
     if bootstrap.is_none() {
         cpu.pc = 0x100;
     }
