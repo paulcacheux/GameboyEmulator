@@ -625,6 +625,17 @@ impl<M: Memory> CPU<M> {
             },
             0x97 => Instruction::SubAWithReg8 { reg: Register8::A },
 
+            0x98 => Instruction::SbcAWithReg8 { reg: Register8::B },
+            0x99 => Instruction::SbcAWithReg8 { reg: Register8::C },
+            0x9A => Instruction::SbcAWithReg8 { reg: Register8::D },
+            0x9B => Instruction::SbcAWithReg8 { reg: Register8::E },
+            0x9C => Instruction::SbcAWithReg8 { reg: Register8::H },
+            0x9D => Instruction::SbcAWithReg8 { reg: Register8::L },
+            0x9E => Instruction::SbcAWithIndirect {
+                addr: Register16::HL,
+            },
+            0x9F => Instruction::SbcAWithReg8 { reg: Register8::A },
+
             0xA0 => Instruction::AndAWithReg8 { reg: Register8::B },
             0xA1 => Instruction::AndAWithReg8 { reg: Register8::C },
             0xA2 => Instruction::AndAWithReg8 { reg: Register8::D },
@@ -759,6 +770,9 @@ impl<M: Memory> CPU<M> {
                 addr: self.fetch_and_advance_u16(),
             },
             // 0xDD => nothing
+            0xDE => Instruction::SbcAWithLiteral {
+                literal: self.fetch_and_advance(),
+            },
             0xE0 => Instruction::WriteReg8ValueAtZeroPageOffsetLiteral {
                 lit_offset: self.fetch_and_advance(),
                 reg: Register8::A,
@@ -961,14 +975,10 @@ impl<M: Memory> CPU<M> {
                     self.update_flags_arith(res, false, carry, half_carry);
                 }
                 MicroOp::SubA { rhs } => {
-                    let a_value = self.reg_a;
-                    let rhs_value = self.source_8bits_to_value(rhs);
-
-                    let (res, carry) = a_value.overflowing_sub(rhs_value);
-                    let half_carry = check_half_carry_sub(a_value, rhs_value);
-
-                    self.reg_a = res;
-                    self.update_flags_arith(res, true, carry, half_carry);
+                    self.sub_a(self.source_8bits_to_value(rhs), false, true);
+                }
+                MicroOp::SbcA { rhs } => {
+                    self.sub_a(self.source_8bits_to_value(rhs), true, true);
                 }
                 MicroOp::DAA => {
                     let mut a = self.reg_a as u32;
@@ -1149,8 +1159,8 @@ impl<M: Memory> CPU<M> {
                     );
                 }
                 MicroOp::CompareA { rhs } => {
-                    let value = self.source_8bits_to_value(rhs);
-                    self.compare_a(value);
+                    let rhs = self.source_8bits_to_value(rhs);
+                    self.sub_a(rhs, false, false);
                 }
                 MicroOp::RotateLeftThroughCarry { reg, set_zero } => {
                     let value = self.load_reg8(reg);
@@ -1222,23 +1232,26 @@ impl<M: Memory> CPU<M> {
         }
     }
 
-    fn compare_a(&mut self, with: u8) {
-        let a_value = self.reg_a;
-        let (res, carry) = a_value.overflowing_sub(with);
+    fn sub_a(&mut self, b: u8, use_carry: bool, apply_res: bool) {
+        let c = if use_carry && self.flags.contains(Flags::CARRY) {
+            1
+        } else {
+            0
+        };
 
-        let mut flags = Flags::NEGATIVE;
-        if res == 0 {
-            flags |= Flags::ZERO;
-        }
+        let a = self.reg_a;
+        let res = a.wrapping_sub(b).wrapping_sub(c);
 
-        if check_half_carry_sub(a_value, with) {
-            flags |= Flags::HALF_CARRY;
-        }
+        self.update_flags_arith(
+            res,
+            true,
+            (a as u16) < (b as u16) + (c as u16),
+            (a & 0x0F) < (b & 0x0F) + c,
+        );
 
-        if carry {
-            flags |= Flags::CARRY;
+        if apply_res {
+            self.reg_a = res;
         }
-        self.flags = flags;
     }
 
     fn update_flags_arith(&mut self, res: u8, negative: bool, carry: bool, half_carry: bool) {

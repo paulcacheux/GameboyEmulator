@@ -85,6 +85,15 @@ pub enum Instruction {
     SubAWithIndirect {
         addr: Register16,
     },
+    SbcAWithReg8 {
+        reg: Register8,
+    },
+    SbcAWithLiteral {
+        literal: u8,
+    },
+    SbcAWithIndirect {
+        addr: Register16,
+    },
     DAA,
     ComplementA,
     WriteReg8ValueAtAddress {
@@ -311,6 +320,15 @@ impl fmt::Display for Instruction {
             }
             Instruction::SubAWithIndirect { addr } => {
                 write!(f, "SUB A, ({})", addr)
+            }
+            Instruction::SbcAWithReg8 { reg } => {
+                write!(f, "SBC A, {}", reg)
+            }
+            Instruction::SbcAWithLiteral { literal } => {
+                write!(f, "SBC A, ${:02x}", literal)
+            }
+            Instruction::SbcAWithIndirect { addr } => {
+                write!(f, "SBC A, ({})", addr)
             }
             Instruction::DAA => write!(f, "DAA"),
             Instruction::ComplementA => write!(f, "CPL"),
@@ -572,6 +590,20 @@ impl Instruction {
             }
             Instruction::SubAWithIndirect { addr } => {
                 vec![MicroOp::NOP, MicroOp::SubA { rhs: addr.into() }]
+            }
+            Instruction::SbcAWithReg8 { reg } => {
+                vec![MicroOp::SbcA { rhs: reg.into() }]
+            }
+            Instruction::SbcAWithLiteral { literal } => {
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::SbcA {
+                        rhs: literal.into(),
+                    },
+                ]
+            }
+            Instruction::SbcAWithIndirect { addr } => {
+                vec![MicroOp::NOP, MicroOp::SbcA { rhs: addr.into() }]
             }
             Instruction::DAA => vec![MicroOp::DAA],
             Instruction::ComplementA => vec![MicroOp::ComplementA],

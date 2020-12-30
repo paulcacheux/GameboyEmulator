@@ -76,6 +76,9 @@ pub enum MicroOp {
     SubA {
         rhs: Source8bits,
     },
+    SbcA {
+        rhs: Source8bits,
+    },
     DAA,
     ComplementA,
     WriteMem {
