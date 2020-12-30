@@ -909,14 +909,22 @@ impl Instruction {
                 source: reg,
             }],
             Instruction::IncReg16 { reg } => vec![MicroOp::NOP, MicroOp::IncReg16 { reg }],
-            Instruction::IncReg8 { reg } => vec![MicroOp::IncReg { reg }],
+            Instruction::IncReg8 { reg } => vec![MicroOp::Inc { reg: reg.into() }],
             Instruction::IncIndirect { addr } => {
-                vec![MicroOp::NOP, MicroOp::NOP, MicroOp::IncIndirect { addr }]
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::Inc { reg: addr.into() },
+                ]
             }
             Instruction::DecReg16 { reg } => vec![MicroOp::NOP, MicroOp::DecReg16 { reg }],
-            Instruction::DecReg8 { reg } => vec![MicroOp::DecReg { reg }],
+            Instruction::DecReg8 { reg } => vec![MicroOp::Dec { reg: reg.into() }],
             Instruction::DecIndirect { addr } => {
-                vec![MicroOp::NOP, MicroOp::NOP, MicroOp::DecIndirect { addr }]
+                vec![
+                    MicroOp::NOP,
+                    MicroOp::NOP,
+                    MicroOp::Dec { reg: addr.into() },
+                ]
             }
             Instruction::CompareAWithLiteral { literal } => {
                 vec![

@@ -7,7 +7,6 @@ pub enum Destination8Bits {
     Address(u16),
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Source8bits {
     Register(Register8),
@@ -32,6 +31,24 @@ impl From<Register16> for Source8bits {
 impl From<u8> for Source8bits {
     fn from(literal: u8) -> Self {
         Source8bits::Literal(literal)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Reg8OrIndirect {
+    Reg8(Register8),
+    Indirect(Register16),
+}
+
+impl From<Register8> for Reg8OrIndirect {
+    fn from(reg: Register8) -> Self {
+        Reg8OrIndirect::Reg8(reg)
+    }
+}
+
+impl From<Register16> for Reg8OrIndirect {
+    fn from(reg: Register16) -> Self {
+        Reg8OrIndirect::Indirect(reg)
     }
 }
 
@@ -104,20 +121,14 @@ pub enum MicroOp {
     IncReg16 {
         reg: Register16,
     },
-    IncReg {
-        reg: Register8,
-    },
-    IncIndirect {
-        addr: Register16,
+    Inc {
+        reg: Reg8OrIndirect,
     },
     DecReg16 {
         reg: Register16,
     },
-    DecReg {
-        reg: Register8,
-    },
-    DecIndirect {
-        addr: Register16,
+    Dec {
+        reg: Reg8OrIndirect,
     },
     CompareA {
         rhs: Source8bits,

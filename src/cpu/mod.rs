@@ -8,7 +8,7 @@ mod register;
 
 use instruction::{Instruction, JumpCondition};
 use log::{debug, info};
-use micro_op::{Destination8Bits, MicroOp, Source8bits};
+use micro_op::{Destination8Bits, MicroOp, Reg8OrIndirect, Source8bits};
 use register::{Register16, Register8};
 
 use self::instruction::PrePostOperation;
@@ -934,6 +934,22 @@ impl<M: Memory> CPU<M> {
         }
     }
 
+    fn load_reg8_or_indirect(&self, op: Reg8OrIndirect) -> u8 {
+        match op {
+            Reg8OrIndirect::Reg8(reg) => self.load_reg8(reg),
+            Reg8OrIndirect::Indirect(addr) => self.memory.read_memory(self.load_reg16(addr)),
+        }
+    }
+
+    fn store_reg8_or_indirect(&mut self, op: Reg8OrIndirect, value: u8) {
+        match op {
+            Reg8OrIndirect::Reg8(reg) => self.store_reg8(reg, value),
+            Reg8OrIndirect::Indirect(addr) => {
+                self.memory.write_memory(self.load_reg16(addr), value)
+            }
+        }
+    }
+
     pub fn step(&mut self) {
         if self.pipeline.is_empty() {
             let instruction = self.fetch_and_decode();
@@ -1164,11 +1180,11 @@ impl<M: Memory> CPU<M> {
                     // No flags change for this micro op
                     self.store_reg16(reg, self.load_reg16(reg).wrapping_add(1));
                 }
-                MicroOp::IncReg { reg } => {
-                    let reg_value = self.load_reg8(reg);
+                MicroOp::Inc { reg } => {
+                    let reg_value = self.load_reg8_or_indirect(reg);
                     let half_carry = check_half_carry(reg_value, 1);
                     let new_value = reg_value.wrapping_add(1);
-                    self.store_reg8(reg, new_value);
+                    self.store_reg8_or_indirect(reg, new_value);
                     let mut flags = Flags::empty();
                     if new_value == 0 {
                         flags |= Flags::ZERO;
@@ -1179,43 +1195,15 @@ impl<M: Memory> CPU<M> {
                     flags |= self.flags & Flags::CARRY;
                     self.flags = flags;
                 }
-                MicroOp::IncIndirect { addr } => {
-                    let addr = self.load_reg16(addr);
-                    let start_value = self.memory.read_memory(addr);
-                    let half_carry = check_half_carry(start_value, 1);
-                    let new_value = start_value.wrapping_add(1);
-                    self.memory.write_memory(addr, new_value);
-
-                    self.update_flags_arith(
-                        new_value,
-                        false,
-                        self.flags.contains(Flags::CARRY),
-                        half_carry,
-                    );
-                }
                 MicroOp::DecReg16 { reg } => {
                     // No flags change for this micro op
                     self.store_reg16(reg, self.load_reg16(reg).wrapping_sub(1));
                 }
-                MicroOp::DecReg { reg } => {
-                    let reg_value = self.load_reg8(reg);
+                MicroOp::Dec { reg } => {
+                    let reg_value = self.load_reg8_or_indirect(reg);
                     let half_carry = check_half_carry_sub(reg_value, 1);
                     let new_value = reg_value.wrapping_sub(1);
-                    self.store_reg8(reg, new_value);
-
-                    self.update_flags_arith(
-                        new_value,
-                        true,
-                        self.flags.contains(Flags::CARRY),
-                        !half_carry,
-                    );
-                }
-                MicroOp::DecIndirect { addr } => {
-                    let addr = self.load_reg16(addr);
-                    let start_value = self.memory.read_memory(addr);
-                    let half_carry = check_half_carry_sub(start_value, 1);
-                    let new_value = start_value.wrapping_sub(1);
-                    self.memory.write_memory(addr, new_value);
+                    self.store_reg8_or_indirect(reg, new_value);
 
                     self.update_flags_arith(
                         new_value,
