@@ -90,10 +90,10 @@ impl InterruptController {
     fn timer_divider(&self) -> u32 {
         let control = self.timer_control & 0b11;
         match control {
-            00 => 1024,
-            01 => 16,
-            10 => 64,
-            11 => 256,
+            0b00 => 1024,
+            0b01 => 16,
+            0b10 => 64,
+            0b11 => 256,
             _ => unreachable!(),
         }
     }
