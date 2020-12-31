@@ -16,6 +16,31 @@ bitflags! {
     }
 }
 
+bitflags! {
+    pub struct JoypadBits: u8 {
+        const P15_SELECT_BUTTON_KEYS    = 1 << 5;
+        const P14_SELECT_DIRECTION_KEYS = 1 << 4;
+        const P13_INPUT_DOWN_OR_START   = 1 << 3;
+        const P12_INPUT_UP_OR_SELECT    = 1 << 2;
+        const P11_INPUT_LEFT_OR_B       = 1 << 1;
+        const P10_INPUT_RIGHT_OR_A      = 1 << 0;
+    }
+}
+
+#[repr(usize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Keys {
+    Up = 0,
+    Down,
+    Left,
+    Right,
+    A,
+    B,
+    Start,
+    Select,
+    KeysMax,
+}
+
 #[derive(Debug)]
 pub struct InterruptController {
     pub master_enable: bool,
@@ -33,6 +58,10 @@ pub struct InterruptController {
 
     pub should_redraw: bool,
     new_int_waiting: bool,
+
+    keys_state: [bool; Keys::KeysMax as usize],
+    select_buttons: bool,
+    select_directions: bool,
 }
 
 impl InterruptController {
@@ -53,6 +82,10 @@ impl InterruptController {
 
             should_redraw: false,
             new_int_waiting: false,
+
+            keys_state: [false; Keys::KeysMax as usize],
+            select_buttons: false,
+            select_directions: false,
         }
     }
 
@@ -142,5 +175,56 @@ impl InterruptController {
             }
         }
         None
+    }
+
+    pub fn change_key_state(&mut self, key: Keys, pressed: bool) {
+        self.keys_state[key as usize] = pressed;
+        todo!("Trigger interruption")
+    }
+
+    pub fn write_joypad_reg(&mut self, reg_value: u8) {
+        // 0 is selected
+        let flags = JoypadBits::from_bits_truncate(!reg_value);
+
+        self.select_directions = flags.contains(JoypadBits::P14_SELECT_DIRECTION_KEYS);
+        self.select_buttons = flags.contains(JoypadBits::P15_SELECT_BUTTON_KEYS);
+    }
+
+    pub fn read_joypad_reg(&mut self) -> u8 {
+        let mut flags = JoypadBits::empty();
+
+        if self.select_directions {
+            flags |= JoypadBits::P14_SELECT_DIRECTION_KEYS;
+            if self.keys_state[Keys::Down as usize] {
+                flags |= JoypadBits::P13_INPUT_DOWN_OR_START;
+            }
+            if self.keys_state[Keys::Up as usize] {
+                flags |= JoypadBits::P12_INPUT_UP_OR_SELECT;
+            }
+            if self.keys_state[Keys::Left as usize] {
+                flags |= JoypadBits::P11_INPUT_LEFT_OR_B;
+            }
+            if self.keys_state[Keys::Right as usize] {
+                flags |= JoypadBits::P10_INPUT_RIGHT_OR_A;
+            }
+        }
+
+        if self.select_buttons {
+            flags |= JoypadBits::P15_SELECT_BUTTON_KEYS;
+            if self.keys_state[Keys::Start as usize] {
+                flags |= JoypadBits::P13_INPUT_DOWN_OR_START;
+            }
+            if self.keys_state[Keys::Select as usize] {
+                flags |= JoypadBits::P12_INPUT_UP_OR_SELECT;
+            }
+            if self.keys_state[Keys::B as usize] {
+                flags |= JoypadBits::P11_INPUT_LEFT_OR_B;
+            }
+            if self.keys_state[Keys::A as usize] {
+                flags |= JoypadBits::P10_INPUT_RIGHT_OR_A;
+            }
+        }
+
+        !flags.bits()
     }
 }

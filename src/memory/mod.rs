@@ -79,7 +79,7 @@ impl MMU {
 
     pub fn read_io_reg(&self, addr: u16) -> u8 {
         if addr == JOYPAD_STATUS_ADDR {
-            (self.io_regs[JOYPAD_STATUS_ADDR as usize - 0xFF00] & 0xF0) | 0xF
+            self.interrupt_controller.lock().unwrap().read_joypad_reg()
         } else if addr == DIVIDER_REGISTER_ADDR {
             self.interrupt_controller.lock().unwrap().divider_register
         } else if addr == TIMER_COUNTER_ADDR {
@@ -100,7 +100,12 @@ impl MMU {
     }
 
     pub fn write_io_reg(&mut self, addr: u16, value: u8) {
-        if addr == DIVIDER_REGISTER_ADDR {
+        if addr == JOYPAD_STATUS_ADDR {
+            self.interrupt_controller
+                .lock()
+                .unwrap()
+                .write_joypad_reg(value)
+        } else if addr == DIVIDER_REGISTER_ADDR {
             self.interrupt_controller.lock().unwrap().divider_register = 0;
         } else if addr == TIMER_COUNTER_ADDR {
             self.interrupt_controller.lock().unwrap().timer_counter = value;
