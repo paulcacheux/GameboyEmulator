@@ -60,7 +60,7 @@ impl MBC for MBC1 {
                 }
             }
             0x2000..=0x3FFF => {
-                let value = value & 0x20;
+                let value = value & 0b11111;
                 let mut bank_index = value as usize % self.bank_count;
                 if bank_index & 0xF == 0 {
                     bank_index += 1;
