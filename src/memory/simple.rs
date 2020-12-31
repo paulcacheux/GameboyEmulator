@@ -20,7 +20,7 @@ impl Simple {
 impl MBC for Simple {
     fn read_memory(&self, addr: u16) -> u8 {
         match addr {
-            0x0100..=0x7FFF => self.rom[addr as usize],
+            0x0000..=0x7FFF => self.rom[addr as usize],
             _ => {
                 debug!("Read from uncontrolled MBC space");
                 0xFF

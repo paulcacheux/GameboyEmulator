@@ -20,6 +20,17 @@ pub struct MMU {
     interrupt_controller: InterruptControllerPtr,
 }
 
+const SERIAL_TRANSFER_DATA_ADDR: u16 = 0xFF01;
+const SERIAL_TRANSFER_CONTROL_ADDR: u16 = 0xFF02;
+const BOOTSTRAP_ROM_MOUNT_CONTROL_ADDR: u16 = 0xFF50;
+
+const DIVIDER_REGISTER_ADDR: u16 = 0xFF04;
+const TIMER_COUNTER_ADDR: u16 = 0xFF05;
+const TIMER_MODULO_ADDR: u16 = 0xFF06;
+const TIMER_CONTROL_ADDR: u16 = 0xFF07;
+
+const INTERRUPT_FLAG_ADDR: u16 = 0xFF0F;
+
 impl MMU {
     pub fn new(mbc: Box<dyn MBC>, int_controller: InterruptControllerPtr) -> Self {
         let mut mmu = MMU {
@@ -37,6 +48,7 @@ impl MMU {
     }
 
     fn init_default_values(&mut self) {
+        self.write_memory(0xFF00, 0xFF);
         self.write_memory(0xFF4D, 0xFF);
     }
 
@@ -56,7 +68,7 @@ impl MMU {
         if self.read_memory(BOOTSTRAP_ROM_MOUNT_CONTROL_ADDR) != 0 {
             self.mbc.write_memory(addr, value);
         } else {
-            self.bootstrap_rom[addr as usize] = value;
+            // do nothing here
         }
     }
 
@@ -101,17 +113,6 @@ impl MMU {
         }
     }
 }
-
-const SERIAL_TRANSFER_DATA_ADDR: u16 = 0xFF01;
-const SERIAL_TRANSFER_CONTROL_ADDR: u16 = 0xFF02;
-const BOOTSTRAP_ROM_MOUNT_CONTROL_ADDR: u16 = 0xFF50;
-
-const DIVIDER_REGISTER_ADDR: u16 = 0xFF04;
-const TIMER_COUNTER_ADDR: u16 = 0xFF05;
-const TIMER_MODULO_ADDR: u16 = 0xFF06;
-const TIMER_CONTROL_ADDR: u16 = 0xFF07;
-
-const INTERRUPT_FLAG_ADDR: u16 = 0xFF0F;
 
 impl Memory for MMU {
     fn read_memory(&self, addr: u16) -> u8 {
