@@ -32,6 +32,7 @@ pub struct InterruptController {
     pub timer_control: u8,
 
     pub should_redraw: bool,
+    new_int_waiting: bool,
 }
 
 impl InterruptController {
@@ -51,6 +52,7 @@ impl InterruptController {
             timer_control: 0,
 
             should_redraw: false,
+            new_int_waiting: false,
         }
     }
 
@@ -102,11 +104,19 @@ impl InterruptController {
 
     pub fn trigger_vblank_int(&mut self) {
         self.interrupt_flag |= IntKind::VBLANK;
+        self.new_int_waiting = true;
         self.should_redraw = true;
     }
 
     pub fn trigger_timer_int(&mut self) {
         self.interrupt_flag |= IntKind::TIMER;
+        self.new_int_waiting = true;
+    }
+
+    pub fn handle_new_interrupt(&mut self) -> bool {
+        let res = self.new_int_waiting;
+        self.new_int_waiting = false;
+        res
     }
 
     pub fn is_interrupt_waiting(&self) -> Option<IntKind> {

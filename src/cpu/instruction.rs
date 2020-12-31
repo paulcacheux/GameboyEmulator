@@ -280,6 +280,7 @@ pub enum Instruction {
     ComplementCarryFlag,
     EnableInterrupts,
     DisableInterrupts,
+    Halt,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -594,6 +595,7 @@ impl fmt::Display for Instruction {
             Instruction::ComplementCarryFlag => write!(f, "CCF"),
             Instruction::EnableInterrupts => write!(f, "EI"),
             Instruction::DisableInterrupts => write!(f, "DI"),
+            Instruction::Halt => write!(f, "HALT"),
         }
     }
 }
@@ -1262,6 +1264,7 @@ impl Instruction {
             Instruction::ComplementCarryFlag => vec![MicroOp::ComplementCarryFlag],
             Instruction::EnableInterrupts => vec![MicroOp::EnableInterrupts],
             Instruction::DisableInterrupts => vec![MicroOp::DisableInterrupts],
+            Instruction::Halt => vec![MicroOp::Halt],
         }
     }
 }

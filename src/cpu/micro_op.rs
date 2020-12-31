@@ -178,6 +178,7 @@ pub enum MicroOp {
     ComplementCarryFlag,
     EnableInterrupts,
     DisableInterrupts,
+    Halt,
 }
 
 pub mod simpl {

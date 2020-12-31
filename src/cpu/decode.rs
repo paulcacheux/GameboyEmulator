@@ -416,6 +416,7 @@ pub fn decode_instruction<M: Memory>(cpu: &mut CPU<M>) -> Instruction {
             reg: Register8::L,
             post_op: None,
         },
+        0x76 => Instruction::Halt,
         0x77 => Instruction::WriteReg8ValueAtIndirect {
             addr: Register16::HL,
             reg: Register8::A,

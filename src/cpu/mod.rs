@@ -46,6 +46,7 @@ pub struct CPU<M: Memory> {
 
     pipeline: VecDeque<MicroOp>,
     interrupt_controller: InterruptControllerPtr,
+    halted: bool,
 }
 
 impl<M: Memory> CPU<M> {
@@ -64,6 +65,7 @@ impl<M: Memory> CPU<M> {
             flags: Flags::empty(),
             pipeline: VecDeque::new(),
             interrupt_controller,
+            halted: false,
         }
     }
 
@@ -201,6 +203,10 @@ impl<M: Memory> CPU<M> {
 
     fn handle_interrupts(&mut self) {
         let mut controller = self.interrupt_controller.lock().unwrap();
+        if controller.handle_new_interrupt() {
+            self.halted = false;
+        }
+
         if let Some(kind) = controller.is_interrupt_waiting() {
             controller.interrupt_flag.remove(kind);
             controller.master_enable = false;
@@ -251,7 +257,7 @@ impl<M: Memory> CPU<M> {
             self.handle_interrupts();
         }
 
-        if self.pipeline.is_empty() {
+        if self.pipeline.is_empty() && !self.halted {
             self.decode_next_instruction();
         }
 
@@ -645,6 +651,9 @@ impl<M: Memory> CPU<M> {
                 }
                 MicroOp::DisableInterrupts => {
                     self.interrupt_controller.lock().unwrap().master_enable = false;
+                }
+                MicroOp::Halt => {
+                    self.halted = true;
                 }
             }
         }
