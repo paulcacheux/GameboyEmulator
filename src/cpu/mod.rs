@@ -245,7 +245,7 @@ impl<M: Memory> CPU<M> {
     }
 
     pub fn step(&mut self) {
-        self.interrupt_controller.lock().unwrap().timer_step();
+        self.interrupt_controller.lock().unwrap().timer_step(4);
 
         if self.pipeline.is_empty() {
             self.handle_interrupts();

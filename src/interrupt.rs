@@ -23,7 +23,7 @@ pub struct InterruptController {
     pub interrupt_flag: IntKind,
 
     pub divider_register: u8,
-    divider_counter: u8,
+    divider_counter: u32,
 
     pub timer_counter: u8,
     pub timer_modulo: u8,
@@ -54,26 +54,30 @@ impl InterruptController {
         }
     }
 
-    pub fn timer_step(&mut self) {
+    pub fn timer_step(&mut self, ticks: u32) {
         // divider (increase at 1/256 the frequency of the CPU)
-        let (new_counter, trigger) = self.divider_counter.overflowing_add(1);
-        self.divider_counter = new_counter;
-        if trigger {
+        self.divider_counter = self.divider_counter.wrapping_add(ticks);
+        while self.divider_counter >= 256 {
             self.divider_register = self.divider_register.wrapping_add(1);
+            self.divider_counter -= 256;
         }
 
         // timer
         if self.is_timer_enabled() {
-            self.timer_sub_counter += 1;
-            if self.timer_sub_counter >= self.timer_divider() {
-                self.timer_sub_counter = 0;
+            let divider = self.timer_divider();
+
+            self.timer_sub_counter += ticks;
+            while self.timer_sub_counter >= divider {
+                self.timer_sub_counter;
                 let (new_timer, carry) = self.timer_counter.overflowing_add(1);
                 self.timer_counter = if carry {
                     self.trigger_timer_int();
                     self.timer_modulo
                 } else {
                     new_timer
-                }
+                };
+
+                self.timer_sub_counter -= divider;
             }
         } else {
             self.timer_counter = 0;
