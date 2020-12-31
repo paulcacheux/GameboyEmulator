@@ -300,11 +300,23 @@ impl PPUState {
 }
 
 fn pixel_color_to_screen_color(color: u8) -> [u8; 4] {
+    /*
+    // green
     match color {
         0 => [150, 182, 15, 255],
         1 => [135, 167, 15, 255],
         2 => [46, 95, 46, 255],
         3 => [15, 54, 15, 255],
+        _ => panic!("Out of range color"),
+    }
+    */
+
+    // gray
+    match color {
+        0 => [255, 255, 255, 255],
+        1 => [169, 169, 169, 255],
+        2 => [84, 84, 84, 255],
+        3 => [0, 0, 0, 255],
         _ => panic!("Out of range color"),
     }
 }
