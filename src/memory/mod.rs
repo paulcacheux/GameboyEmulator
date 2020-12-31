@@ -22,7 +22,7 @@ pub struct MMU {
 
 impl MMU {
     pub fn new(mbc: Box<dyn MBC>, int_controller: InterruptControllerPtr) -> Self {
-        MMU {
+        let mut mmu = MMU {
             bootstrap_rom: Box::new([0; 0x100]),
             mbc,
             vram: Box::new([0; 0x2000]),
@@ -31,7 +31,13 @@ impl MMU {
             io_regs: Box::new([0; 0x80]),
             hram: Box::new([0; 0x7F]),
             interrupt_controller: int_controller,
-        }
+        };
+        mmu.init_default_values();
+        mmu
+    }
+
+    fn init_default_values(&mut self) {
+        self.write_memory(0xFF4D, 0xFF);
     }
 
     pub fn write_bootstrap_rom(&mut self, slice: &[u8]) {
