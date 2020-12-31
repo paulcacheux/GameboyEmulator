@@ -28,7 +28,7 @@ impl MBC for Simple {
         }
     }
 
-    fn write_memory(&mut self, _addr: u16, _value: u8) {
-        error!("Write to ROM error")
+    fn write_memory(&mut self, addr: u16, value: u8) {
+        error!("Write to ROM error: mem[{:#x}] = {:#x}", addr, value)
     }
 }

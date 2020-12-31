@@ -20,6 +20,8 @@ pub struct MMU {
     interrupt_controller: InterruptControllerPtr,
 }
 
+const JOYPAD_STATUS_ADDR: u16 = 0xFF00;
+
 const SERIAL_TRANSFER_DATA_ADDR: u16 = 0xFF01;
 const SERIAL_TRANSFER_CONTROL_ADDR: u16 = 0xFF02;
 const BOOTSTRAP_ROM_MOUNT_CONTROL_ADDR: u16 = 0xFF50;
@@ -48,7 +50,6 @@ impl MMU {
     }
 
     fn init_default_values(&mut self) {
-        self.write_memory(0xFF00, 0xFF);
         self.write_memory(0xFF4D, 0xFF);
     }
 
@@ -77,7 +78,9 @@ impl MMU {
     }
 
     pub fn read_io_reg(&self, addr: u16) -> u8 {
-        if addr == DIVIDER_REGISTER_ADDR {
+        if addr == JOYPAD_STATUS_ADDR {
+            (self.io_regs[JOYPAD_STATUS_ADDR as usize - 0xFF00] & 0xF0) | 0xF
+        } else if addr == DIVIDER_REGISTER_ADDR {
             self.interrupt_controller.lock().unwrap().divider_register
         } else if addr == TIMER_COUNTER_ADDR {
             self.interrupt_controller.lock().unwrap().timer_counter
