@@ -77,6 +77,30 @@ impl<M: Memory> PPU<M> {
         }
     }
 
+    pub fn draw_tiles_into_fb(&self, fb: &mut [u8]) {
+        let addresses: Vec<u16> = (0x8000..0x9800).collect();
+        for (tile_id, tile) in addresses.chunks_exact(16).enumerate() {
+            let tile_y = tile_id / 20;
+            let tile_x = tile_id % 20;
+
+            for (y, byte_addresses) in tile.chunks_exact(2).enumerate() {
+                let low = self.memory.read_memory(byte_addresses[0]);
+                let high = self.memory.read_memory(byte_addresses[1]);
+                let pixels = fetcher::byte_pair_to_pixels(low, high, PixelSource::BackgroundWindow);
+
+                for (x, pixel) in pixels.iter().enumerate() {
+                    let screen_color = pixel_color_to_screen_color(pixel.color);
+
+                    let final_y = tile_y * 8 + y;
+                    let final_x = tile_x * 8 + x;
+                    let offset = (final_y * (20 * 8) + final_x) * 4;
+
+                    fb[offset..(offset + 4)].copy_from_slice(&screen_color);
+                }
+            }
+        }
+    }
+
     fn control_reg(&self) -> ControlReg {
         ControlReg::from_bits(self.memory.read_memory(LCD_CONTROL_REG_ADDR))
             .expect("Failed to read control_reg")
@@ -332,6 +356,7 @@ pub fn dump_tiles_to_file(memory: &dyn Memory, path: &str) -> Result<(), std::io
 
     writeln!(&mut writer, "P3")?;
     writeln!(&mut writer, "8 {}", addresses.len() / 2)?;
+    writeln!(&mut writer, "255")?;
 
     for tile in addresses.chunks_exact(16) {
         for byte_addresses in tile.chunks_exact(2) {

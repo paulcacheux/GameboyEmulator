@@ -24,6 +24,9 @@ const MULTIPLIER: u32 = 4;
 const WINDOW_WIDTH: u32 = (SCREEN_WIDTH as u32) * MULTIPLIER;
 const WINDOW_HEIGHT: u32 = (SCREEN_HEIGHT as u32) * MULTIPLIER;
 
+const TILE_WINDOW_WIDTH: u32 = 20 * 8;
+const TILE_WINDOW_HEIGHT: u32 = 20 * 8;
+
 const MACHINE_CYCLE_FREQ: u32 = 1 << 20;
 const MACHINE_CYCLE_PER_FRAME: u32 = MACHINE_CYCLE_FREQ / 60;
 
@@ -69,7 +72,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let event_loop = EventLoop::new();
 
-    let window = {
+    let main_window = {
         let size = LogicalSize::new(WINDOW_WIDTH as f64, WINDOW_HEIGHT as f64);
         WindowBuilder::new()
             .with_title("GameBoy Emulator")
@@ -79,14 +82,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap()
     };
 
-    let mut framebuffer = {
-        let window_physical_size = window.inner_size();
+    let tile_data_window = {
+        let size = LogicalSize::new(
+            (TILE_WINDOW_WIDTH * MULTIPLIER) as f64,
+            (TILE_WINDOW_HEIGHT * MULTIPLIER) as f64,
+        );
+        WindowBuilder::new()
+            .with_title("GameBoy Emulator Tiles")
+            .with_inner_size(size)
+            .with_resizable(false)
+            .build(&event_loop)
+            .unwrap()
+    };
+
+    let mut main_framebuffer = {
+        let window_physical_size = main_window.inner_size();
         let surface_texture = SurfaceTexture::new(
             window_physical_size.width,
             window_physical_size.height,
-            &window,
+            &main_window,
         );
         Pixels::new(SCREEN_WIDTH as _, SCREEN_HEIGHT as _, surface_texture)?
+    };
+
+    let mut tiles_framebuffer = {
+        let window_physical_size = tile_data_window.inner_size();
+        let surface_texture = SurfaceTexture::new(
+            window_physical_size.width,
+            window_physical_size.height,
+            &tile_data_window,
+        );
+        Pixels::new(TILE_WINDOW_WIDTH, TILE_WINDOW_HEIGHT, surface_texture)?
     };
 
     event_loop.run(move |event, _, control_flow| {
@@ -95,9 +121,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         *control_flow = ControlFlow::Poll;
 
         match event {
-            Event::RedrawRequested(_) => {
-                ppu.draw_into_fb(framebuffer.get_frame());
-                let _ = framebuffer.render();
+            Event::RedrawRequested(win_id) if win_id == main_window.id() => {
+                ppu.draw_into_fb(main_framebuffer.get_frame());
+                let _ = main_framebuffer.render();
+            }
+            Event::RedrawRequested(win_id) if win_id == tile_data_window.id() => {
+                ppu.draw_tiles_into_fb(tiles_framebuffer.get_frame());
+                let _ = tiles_framebuffer.render();
             }
             Event::MainEventsCleared => {
                 for _ in 0..MACHINE_CYCLE_PER_FRAME {
@@ -107,7 +137,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 let mut int_cont = interrupt_controller.lock().unwrap();
                 if int_cont.should_redraw {
-                    window.request_redraw();
+                    main_window.request_redraw();
+                    tile_data_window.request_redraw();
                     int_cont.should_redraw = false;
                 }
             }
