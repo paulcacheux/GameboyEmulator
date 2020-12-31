@@ -193,16 +193,15 @@ pub fn build_mbc(content: &[u8]) -> Box<dyn MBC> {
     let rom_size = (1 << 15) << content[CARTRIDGE_ROM_SIZE_ADDR];
     assert_eq!(rom_size, content.len());
 
-    let ram_size_power = match content[CARTRIDGE_RAM_SIZE_ADDR] {
+    let ram_size = match content[CARTRIDGE_RAM_SIZE_ADDR] {
         0x00 => 0,
-        0x01 => 11,
-        0x02 => 13,
-        0x03 => 15,
-        0x04 => 17,
-        0x05 => 16,
+        0x01 => 1 << 11,
+        0x02 => 1 << 13,
+        0x03 => 1 << 15,
+        0x04 => 1 << 17,
+        0x05 => 1 << 16,
         _ => panic!("Unknown RAM Size"),
     };
-    let ram_size = 1 << ram_size_power;
 
     match content[CARTRIDGE_TYPE_ADDR] {
         0x00 => Box::new(SimpleMBC::new(content)),
