@@ -42,6 +42,7 @@ pub struct PPU<M: Memory> {
     scan_line: u8,
     dot_in_line: u32,
     state: PPUState,
+    int_cond_met: bool,
 
     pub previous_frame: [u8; PIXEL_COUNT],
     pub frame: [u8; PIXEL_COUNT],
@@ -58,6 +59,7 @@ impl<M: Memory> PPU<M> {
             scan_line: 0,
             dot_in_line: 0,
             state: PPUState::OAMSearchInit,
+            int_cond_met: false,
 
             previous_frame: [0; PIXEL_COUNT],
             frame: [0; PIXEL_COUNT],
@@ -84,14 +86,43 @@ impl<M: Memory> PPU<M> {
         // status reg
         let coincidence = self.scan_line == self.memory.read_memory(LCD_LYC_ADDR);
 
-        let updated_part = ((coincidence as u8) << 3) | (self.state.mode() as u8);
+        let updated_part = ((coincidence as u8) << 2) | (self.state.mode() as u8);
         let old_reg = self.memory.read_memory(LCD_STATUS_REG_ADDR);
         self.memory
-            .write_memory(LCD_STATUS_REG_ADDR, (old_reg & 0xF0) | updated_part);
+            .write_memory(LCD_STATUS_REG_ADDR, (old_reg & 0b11111000) | updated_part);
 
         // LY reg
 
         self.memory.write_memory(LCD_LY_ADDR, self.scan_line);
+    }
+
+    fn maybe_trigger_stat_int(&mut self) {
+        let mut new_int_cond_met = false;
+        let stat_value = self.memory.read_memory(LCD_STATUS_REG_ADDR);
+
+        if (stat_value & (1 << 6) != 0) && (stat_value & (1 << 2) != 0) {
+            new_int_cond_met = true;
+        }
+
+        if (stat_value & (1 << 5) != 0) && (stat_value & 0b11 == 2) {
+            new_int_cond_met = true;
+        }
+
+        if (stat_value & (1 << 4) != 0) && (stat_value & 0b11 == 1) {
+            new_int_cond_met = true;
+        }
+
+        if (stat_value & (1 << 3) != 0) && (stat_value & 0b11 == 0) {
+            new_int_cond_met = true;
+        }
+
+        if !self.int_cond_met && new_int_cond_met {
+            self.interrupt_controller
+                .lock()
+                .unwrap()
+                .trigger_lcd_stat_int();
+        }
+        self.int_cond_met = new_int_cond_met
     }
 
     fn next_dot(&mut self) {
@@ -148,6 +179,7 @@ impl<M: Memory> PPU<M> {
 
     fn cycle(&mut self) {
         self.update_registers();
+        self.maybe_trigger_stat_int();
 
         if self.dot_in_line == 0 && self.scan_line == 0 {
             self.clear_frame();

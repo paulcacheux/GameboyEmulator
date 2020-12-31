@@ -113,6 +113,11 @@ impl InterruptController {
         self.new_int_waiting = true;
     }
 
+    pub fn trigger_lcd_stat_int(&mut self) {
+        self.interrupt_flag |= IntKind::LCD_STAT;
+        self.new_int_waiting = true;
+    }
+
     pub fn handle_new_interrupt(&mut self) -> bool {
         let res = self.new_int_waiting;
         self.new_int_waiting = false;
