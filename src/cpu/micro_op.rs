@@ -179,6 +179,7 @@ pub enum MicroOp {
     EnableInterrupts,
     DisableInterrupts,
     Halt,
+    Stop,
 }
 
 pub mod simpl {

@@ -281,6 +281,7 @@ pub enum Instruction {
     EnableInterrupts,
     DisableInterrupts,
     Halt,
+    Stop,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -596,6 +597,7 @@ impl fmt::Display for Instruction {
             Instruction::EnableInterrupts => write!(f, "EI"),
             Instruction::DisableInterrupts => write!(f, "DI"),
             Instruction::Halt => write!(f, "HALT"),
+            Instruction::Stop => write!(f, "STOP"),
         }
     }
 }
@@ -1265,6 +1267,7 @@ impl Instruction {
             Instruction::EnableInterrupts => vec![MicroOp::EnableInterrupts],
             Instruction::DisableInterrupts => vec![MicroOp::DisableInterrupts],
             Instruction::Halt => vec![MicroOp::Halt],
+            Instruction::Stop => vec![MicroOp::Stop],
         }
     }
 }

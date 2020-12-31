@@ -12,7 +12,7 @@ mod micro_op;
 mod register;
 
 use instruction::{Instruction, JumpCondition};
-use log::debug;
+use log::{debug, warn};
 use micro_op::{Destination8Bits, MicroOp, Reg8OrIndirect, Source8bits};
 use register::{Register16, Register8};
 
@@ -47,6 +47,7 @@ pub struct CPU<M: Memory> {
     pipeline: VecDeque<MicroOp>,
     interrupt_controller: InterruptControllerPtr,
     halted: bool,
+    stoped: bool,
 }
 
 impl<M: Memory> CPU<M> {
@@ -66,6 +67,7 @@ impl<M: Memory> CPU<M> {
             pipeline: VecDeque::new(),
             interrupt_controller,
             halted: false,
+            stoped: false,
         }
     }
 
@@ -205,6 +207,7 @@ impl<M: Memory> CPU<M> {
         let mut controller = self.interrupt_controller.lock().unwrap();
         if controller.handle_new_interrupt() {
             self.halted = false;
+            self.stoped = false;
         }
 
         if let Some(kind) = controller.is_interrupt_waiting() {
@@ -251,13 +254,15 @@ impl<M: Memory> CPU<M> {
     }
 
     pub fn step(&mut self) {
-        self.interrupt_controller.lock().unwrap().timer_step(4);
+        if !self.stoped {
+            self.interrupt_controller.lock().unwrap().timer_step(4);
+        }
 
         if self.pipeline.is_empty() {
             self.handle_interrupts();
         }
 
-        if self.pipeline.is_empty() && !self.halted {
+        if self.pipeline.is_empty() && !self.halted && !self.stoped {
             self.decode_next_instruction();
         }
 
@@ -654,6 +659,10 @@ impl<M: Memory> CPU<M> {
                 }
                 MicroOp::Halt => {
                     self.halted = true;
+                }
+                MicroOp::Stop => {
+                    self.stoped = true;
+                    warn!("CPU stopped pc={:#x}", self.pc);
                 }
             }
         }

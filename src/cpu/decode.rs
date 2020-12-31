@@ -53,6 +53,7 @@ pub fn decode_instruction<M: Memory>(cpu: &mut CPU<M>) -> Instruction {
             literal: cpu.fetch_and_advance(),
         },
         0x0F => Instruction::RotateRightA,
+        0x10 => Instruction::Stop,
         0x11 => Instruction::LoadLiteralIntoReg16 {
             reg: Register16::DE,
             literal: cpu.fetch_and_advance_u16(),
