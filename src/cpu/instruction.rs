@@ -824,6 +824,8 @@ impl Instruction {
             ],
             Instruction::ReadAtAddressToReg8 { reg, addr } => vec![
                 MicroOp::NOP,
+                MicroOp::NOP,
+                MicroOp::NOP,
                 MicroOp::Move8Bits {
                     destination: Destination8Bits::Register(reg),
                     source: Source8bits::Address(addr),
@@ -1030,7 +1032,7 @@ impl Instruction {
                         },
                     ]
                 } else {
-                    vec![MicroOp::NOP, simpl::jump_relative(offset)]
+                    vec![MicroOp::NOP, MicroOp::NOP, simpl::jump_relative(offset)]
                 }
             }
             Instruction::JumpAbsolute { condition, addr } => {
