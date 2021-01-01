@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, io::BufWriter, writeln};
+use std::collections::VecDeque;
 
 use crate::{interrupt::InterruptControllerPtr, memory::Memory};
 use bitflags::bitflags;
@@ -343,62 +343,4 @@ fn pixel_color_to_screen_color(color: u8) -> [u8; 4] {
         3 => [0, 0, 0, 255],
         _ => panic!("Out of range color"),
     }
-}
-
-#[allow(dead_code)]
-pub fn dump_tiles_to_file(memory: &dyn Memory, path: &str) -> Result<(), std::io::Error> {
-    use std::io::Write;
-
-    let file = std::fs::File::create(path)?;
-    let mut writer = BufWriter::new(file);
-
-    let addresses: Vec<u16> = (0x8000..0x9800).collect();
-
-    writeln!(&mut writer, "P3")?;
-    writeln!(&mut writer, "8 {}", addresses.len() / 2)?;
-    writeln!(&mut writer, "255")?;
-
-    for tile in addresses.chunks_exact(16) {
-        for byte_addresses in tile.chunks_exact(2) {
-            let low = memory.read_memory(byte_addresses[0]);
-            let high = memory.read_memory(byte_addresses[1]);
-            let pixels = fetcher::byte_pair_to_pixels(low, high, PixelSource::BackgroundWindow);
-
-            for pixel in &pixels {
-                let screen_color = pixel_color_to_screen_color(pixel.color);
-                for color_part in &screen_color[..3] {
-                    write!(&mut writer, "{} ", color_part)?;
-                }
-            }
-            writeln!(&mut writer)?;
-        }
-    }
-
-    Ok(())
-}
-
-#[allow(dead_code)]
-pub fn dump_frame_to_file(frame: &[u8], path: &str) -> Result<(), std::io::Error> {
-    use std::io::Write;
-
-    assert_eq!(frame.len(), PIXEL_COUNT);
-
-    let file = std::fs::File::create(path)?;
-    let mut writer = BufWriter::new(file);
-
-    writeln!(&mut writer, "P3")?;
-    writeln!(&mut writer, "{} {}", SCREEN_WIDTH, SCREEN_HEIGHT)?;
-
-    for y in 0..SCREEN_HEIGHT {
-        for x in 0..SCREEN_WIDTH {
-            let offset = (y as usize) * (SCREEN_WIDTH as usize) + (x as usize);
-            let screen_color = pixel_color_to_screen_color(frame[offset]);
-            for color_part in &screen_color[..3] {
-                write!(&mut writer, "{} ", color_part)?;
-            }
-            writeln!(&mut writer)?;
-        }
-    }
-
-    Ok(())
 }
