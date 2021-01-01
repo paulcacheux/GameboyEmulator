@@ -3,10 +3,11 @@ use std::{
     sync::{Mutex, RwLock},
 };
 
-use interrupt::InterruptController;
+use interrupt::{InterruptController, Keys};
 use pixels::{Pixels, SurfaceTexture};
 use winit::{
     dpi::LogicalSize,
+    event::{ElementState, VirtualKeyCode},
     event_loop::{ControlFlow, EventLoop},
     window::WindowBuilder,
 };
@@ -147,6 +148,53 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ..
             } => {
                 *control_flow = ControlFlow::Exit;
+            }
+
+            Event::WindowEvent {
+                event: WindowEvent::KeyboardInput { input, .. },
+                ..
+            } => {
+                if let Some(vkc) = input.virtual_keycode {
+                    // let pressed = input.state == ElementState::Pressed;
+                    let pressed: bool = match input.state {
+                        ElementState::Pressed => true,
+                        ElementState::Released => false,
+                    };
+                    let mut int = interrupt_controller.lock().unwrap();
+
+                    match vkc {
+                        VirtualKeyCode::Escape => {
+                            *control_flow = ControlFlow::Exit;
+                        }
+                        VirtualKeyCode::Z | VirtualKeyCode::Up => {
+                            int.change_key_state(Keys::Up, pressed);
+                        }
+                        VirtualKeyCode::Q | VirtualKeyCode::Left => {
+                            int.change_key_state(Keys::Left, pressed);
+                        }
+                        VirtualKeyCode::S | VirtualKeyCode::Down => {
+                            int.change_key_state(Keys::Down, pressed);
+                        }
+                        VirtualKeyCode::D | VirtualKeyCode::Right => {
+                            int.change_key_state(Keys::Right, pressed);
+                        }
+
+                        VirtualKeyCode::O => {
+                            int.change_key_state(Keys::A, pressed);
+                        }
+                        VirtualKeyCode::P => {
+                            int.change_key_state(Keys::B, pressed);
+                        }
+
+                        VirtualKeyCode::Return => {
+                            int.change_key_state(Keys::Start, pressed);
+                        }
+                        VirtualKeyCode::LControl => {
+                            int.change_key_state(Keys::Select, pressed);
+                        }
+                        _ => {}
+                    }
+                }
             }
             _ => {}
         }

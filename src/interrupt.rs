@@ -151,6 +151,11 @@ impl InterruptController {
         self.new_int_waiting = true;
     }
 
+    pub fn trigger_joypad_int(&mut self) {
+        self.interrupt_flag |= IntKind::JOYPAD;
+        self.new_int_waiting = true;
+    }
+
     pub fn handle_new_interrupt(&mut self) -> bool {
         let res = self.new_int_waiting;
         self.new_int_waiting = false;
@@ -179,7 +184,9 @@ impl InterruptController {
 
     pub fn change_key_state(&mut self, key: Keys, pressed: bool) {
         self.keys_state[key as usize] = pressed;
-        todo!("Trigger interruption")
+        if pressed {
+            self.trigger_joypad_int();
+        }
     }
 
     pub fn write_joypad_reg(&mut self, reg_value: u8) {
