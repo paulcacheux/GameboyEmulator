@@ -1,15 +1,18 @@
+use std::marker::PhantomData;
+
 use crate::memory::Memory;
 
 #[derive(Debug, Clone)]
-pub struct Fetcher {
+pub struct Fetcher<M: Memory> {
     map_addr: u16,
     addressing_mode: AddressingMode,
     tile_x: u8,
     tile_y: u8,
     sub_y: u8,
+    phantom_data: PhantomData<M>,
 }
 
-impl Fetcher {
+impl<M: Memory> Fetcher<M> {
     pub fn new(
         map_addr: u16,
         addressing_mode: AddressingMode,
@@ -32,10 +35,11 @@ impl Fetcher {
             tile_x,
             tile_y,
             sub_y,
+            phantom_data: PhantomData,
         }
     }
 
-    pub fn fetch_pixels<M: Memory>(&mut self, memory: &mut M) -> [Pixel; 8] {
+    pub fn fetch_pixels(&mut self, memory: &M) -> [Pixel; 8] {
         let offset = (self.tile_y as u16) * 32 + (self.tile_x as u16);
         let tile_id = memory.read_memory(self.map_addr + offset);
 

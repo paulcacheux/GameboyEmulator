@@ -1,10 +1,10 @@
-use std::collections::VecDeque;
-
 use crate::{interrupt::InterruptControllerPtr, memory::Memory};
 use bitflags::bitflags;
 
 mod fetcher;
+mod pixel_fifo;
 use fetcher::*;
+use pixel_fifo::PixelFIFO;
 
 bitflags! {
     pub struct ControlReg: u8 {
@@ -46,8 +46,8 @@ pub struct PPU<M: Memory> {
 
     pub previous_frame: [u8; PIXEL_COUNT],
     pub frame: [u8; PIXEL_COUNT],
-    fetcher: Option<Fetcher>,
-    fifo: VecDeque<Pixel>,
+
+    pixel_fifo: PixelFIFO<M>,
 }
 
 impl<M: Memory> PPU<M> {
@@ -63,8 +63,8 @@ impl<M: Memory> PPU<M> {
 
             previous_frame: [0; PIXEL_COUNT],
             frame: [0; PIXEL_COUNT],
-            fetcher: None,
-            fifo: VecDeque::new(),
+
+            pixel_fifo: PixelFIFO::new(),
         }
     }
 
@@ -171,36 +171,6 @@ impl<M: Memory> PPU<M> {
         }
     }
 
-    fn prepare_frame_and_fetcher(&mut self) {
-        self.fifo.clear();
-
-        let lcdc = self.control_reg();
-        let fetcher = Fetcher::new(
-            if lcdc.contains(ControlReg::BG_TILE_MAP_DISPLAY_SELECT) {
-                0x9C00
-            } else {
-                0x9800
-            },
-            if lcdc.contains(ControlReg::BG_WINDOW_TILE_DATA_SELECT) {
-                AddressingMode::From8000
-            } else {
-                AddressingMode::From8800
-            },
-            self.memory.read_memory(LCD_SCROLL_X_ADDR),
-            self.memory.read_memory(LCD_SCROLL_Y_ADDR),
-            self.scan_line,
-        );
-
-        self.fetcher = Some(fetcher);
-    }
-
-    fn fill_fifo_if_needed(&mut self) {
-        if self.fifo.len() < 8 {
-            let fetcher = self.fetcher.as_mut().unwrap();
-            self.fifo.extend(&fetcher.fetch_pixels(&mut self.memory));
-        }
-    }
-
     fn cycle(&mut self) {
         self.update_registers();
         self.maybe_trigger_stat_int();
@@ -213,20 +183,17 @@ impl<M: Memory> PPU<M> {
             PPUState::OAMSearchInit => {}
             PPUState::OAMSearch => {}
             PPUState::TransferInit => {
-                self.prepare_frame_and_fetcher();
-                self.fill_fifo_if_needed();
+                self.pixel_fifo
+                    .begin_of_line(self.control_reg(), &self.memory, self.scan_line);
 
                 let scroll_x = self.memory.read_memory(LCD_SCROLL_X_ADDR);
-                for _ in 0..(scroll_x % 8) {
-                    self.fifo.pop_front();
-                }
+                self.pixel_fifo.pop_first_pixels(scroll_x);
             }
             PPUState::Transfer { x } => {
                 assert!(x < 160);
 
-                self.fill_fifo_if_needed();
+                let pixel = self.pixel_fifo.next_pixel(&self.memory);
 
-                let pixel = self.fifo.pop_front().unwrap();
                 let offset = (self.scan_line as usize) * (SCREEN_WIDTH as usize) + (x as usize);
 
                 let bg_palette = self.memory.read_memory(BG_PALETTE_DATA_ADDR);
@@ -236,7 +203,7 @@ impl<M: Memory> PPU<M> {
             }
             PPUState::PostTransfer => {}
             PPUState::HBlankInit => {
-                self.fetcher = None;
+                self.pixel_fifo.end_of_line();
             }
             PPUState::HBlank => {}
             PPUState::VBlankInit => self
