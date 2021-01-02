@@ -78,7 +78,6 @@ impl<M: Memory> PixelFIFO<M> {
                 Some(FetcherKind::Window) => {
                     let scan_line = self.window_scan_line.unwrap_or(0);
                     self.window_scan_line = Some(scan_line + 1);
-                    // let scan_line = self.current_scan_line - *self.window_scan_line.get_or_insert(self.current_scan_line);
 
                     Some(Fetcher::new_window(
                         lcdc.window_tile_map_addr(),
