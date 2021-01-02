@@ -3,18 +3,21 @@ use std::collections::VecDeque;
 use crate::memory::Memory;
 
 use super::{
-    fetcher::{Fetcher, Pixel},
+    fetcher::Fetcher,
+    oam::OAM,
+    pixel::{Pixel, PixelSource},
     LCD_SCROLL_X_ADDR, LCD_SCROLL_Y_ADDR, LCD_WINDOW_X_POSITION_ADDR, LCD_WINDOW_Y_POSITION_ADDR,
 };
-use super::{
-    fetcher::{FetcherKind, PixelSource},
-    ControlReg, LCD_CONTROL_REG_ADDR,
-};
+use super::{fetcher::FetcherKind, ControlReg, LCD_CONTROL_REG_ADDR};
 
 #[derive(Debug, Clone)]
 pub struct PixelFIFO<M: Memory> {
     background_window_fetcher: Option<Fetcher<M>>,
-    fifo: VecDeque<Pixel>,
+    objects: Vec<OAM>,
+
+    background_fifo: VecDeque<Pixel>,
+    oam_fifo: VecDeque<Pixel>,
+
     memory: M,
     window_scan_line: Option<u8>,
     current_scan_line: u8,
@@ -25,7 +28,11 @@ impl<M: Memory> PixelFIFO<M> {
     pub fn new(memory: M) -> Self {
         PixelFIFO {
             background_window_fetcher: None,
-            fifo: VecDeque::new(),
+            objects: Vec::new(),
+
+            background_fifo: VecDeque::new(),
+            oam_fifo: VecDeque::new(),
+
             memory,
             window_scan_line: None,
             current_scan_line: 0,
@@ -88,17 +95,32 @@ impl<M: Memory> PixelFIFO<M> {
                 None => None,
             };
 
-            self.fifo.clear();
+            self.background_fifo.clear();
+        }
+    }
+
+    fn find_oams(&mut self) {
+        for oam_addr in (0xFE00..0xFEA0).step_by(4) {
+            let oam = OAM::read_from_memory(&self.memory, oam_addr);
+            if self.objects.len() < 10 && oam.is_y_hitting(self.current_scan_line) {
+                self.objects.push(oam);
+            }
         }
     }
 
     pub fn begin_of_line(&mut self, scan_line: u8) {
-        self.fifo.clear();
-        self.current_x = 0;
         self.current_scan_line = scan_line;
+        self.background_fifo.clear();
+        self.oam_fifo.clear();
+
+        self.find_oams();
+    }
+
+    pub fn begin_lcd_transfer(&mut self) {
+        self.current_x = 0;
 
         self.match_fetcher_mode();
-        self.fill_fifo_if_needed();
+        self.fill_background_fifo_if_needed();
 
         if self.background_window_fetcher.as_ref().map(|f| f.kind) == Some(FetcherKind::Background)
         {
@@ -108,39 +130,111 @@ impl<M: Memory> PixelFIFO<M> {
 
     fn pop_first_pixels(&mut self, scroll_x: u8) {
         for _ in 0..(scroll_x % 8) {
-            self.fifo.pop_front();
+            self.background_fifo.pop_front();
         }
     }
 
     pub fn next_pixel(&mut self) -> Pixel {
         self.match_fetcher_mode();
 
-        let pixel = if self.background_window_fetcher.is_some() {
-            self.fill_fifo_if_needed();
-            self.fifo.pop_front().unwrap()
+        let background_pixel = if self.background_window_fetcher.is_some() {
+            self.fill_background_fifo_if_needed();
+            self.background_fifo.pop_front().unwrap()
         } else {
             Pixel {
                 color: 0x00,
                 source: PixelSource::BackgroundWindow,
             }
         };
+
+        let oam_pixel = {
+            self.fill_oam_fifo_if_needed();
+            self.oam_fifo.pop_front().unwrap()
+        };
+
         self.current_x += 1;
-        pixel
+        choose_pixel(
+            background_pixel,
+            oam_pixel,
+            self.control_reg().contains(ControlReg::OBJ_DISPLAY_ENABLE),
+        )
     }
 
     pub fn end_of_line(&mut self) {
         self.background_window_fetcher = None;
+        self.objects.clear();
+        self.background_fifo.clear();
+        self.oam_fifo.clear();
     }
 
     pub fn end_of_frame(&mut self) {
         self.window_scan_line = None;
     }
 
-    fn fill_fifo_if_needed(&mut self) {
+    fn fill_background_fifo_if_needed(&mut self) {
         if let Some(fetcher) = self.background_window_fetcher.as_mut() {
-            if self.fifo.len() < 8 {
-                self.fifo.extend(&fetcher.fetch_pixels(&self.memory));
+            if self.background_fifo.len() < 8 {
+                self.background_fifo
+                    .extend(&fetcher.fetch_pixels(&self.memory));
             }
         }
+    }
+
+    fn fill_oam_fifo_if_needed(&mut self) {
+        if self.oam_fifo.len() < 8 {
+            self.oam_fifo.resize_with(8, || Pixel {
+                color: 0,
+                source: PixelSource::OAM {
+                    palette: 0,
+                    bg_priority: true,
+                },
+            });
+        }
+
+        let mut current_oam = None;
+        for oam in &self.objects {
+            if self.current_x + 8 == oam.x_pos {
+                current_oam = Some(oam);
+            }
+        }
+
+        if let Some(oam) = current_oam {
+            let in_oam_y = self.current_scan_line + 16 - oam.y_pos;
+            let pixels = oam.get_pixels(&self.memory, in_oam_y);
+            for i in 0..8 {
+                if self.oam_fifo[i].color == 0 {
+                    self.oam_fifo[i] = pixels[i];
+                }
+            }
+        }
+    }
+}
+
+fn choose_pixel(bg_pixel: Pixel, oam_pixel: Pixel, obj_enable: bool) -> Pixel {
+    match (bg_pixel, oam_pixel) {
+        (
+            Pixel {
+                color: bg_color,
+                source: PixelSource::BackgroundWindow,
+            },
+            Pixel {
+                color: oam_color,
+                source: PixelSource::OAM { bg_priority, .. },
+            },
+        ) => {
+            if !obj_enable {
+                bg_pixel
+            } else if oam_color == 0 {
+                bg_pixel
+            } else if !bg_priority {
+                oam_pixel
+            } else if bg_color != 0 {
+                // && bg_priority
+                bg_pixel
+            } else {
+                oam_pixel
+            }
+        }
+        _ => panic!("Bad mixing between pixels"),
     }
 }

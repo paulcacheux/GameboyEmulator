@@ -2,9 +2,13 @@ use crate::{interrupt::InterruptControllerPtr, memory::Memory};
 use bitflags::bitflags;
 
 mod fetcher;
+mod oam;
+mod pixel;
 mod pixel_fifo;
 use fetcher::*;
 use pixel_fifo::PixelFIFO;
+
+use self::pixel::{byte_pair_to_pixels, PixelSource};
 
 bitflags! {
     pub struct ControlReg: u8 {
@@ -58,7 +62,11 @@ const LCD_SCROLL_Y_ADDR: u16 = 0xFF42;
 const LCD_SCROLL_X_ADDR: u16 = 0xFF43;
 const LCD_LY_ADDR: u16 = 0xFF44;
 const LCD_LYC_ADDR: u16 = 0xFF45;
+
 const BG_PALETTE_DATA_ADDR: u16 = 0xFF47;
+const OAM0_PALETTE_DATA_ADDR: u16 = 0xFF48;
+const OAM1_PALETTE_DATA_ADDR: u16 = 0xFF49;
+
 const LCD_WINDOW_Y_POSITION_ADDR: u16 = 0xFF4A;
 const LCD_WINDOW_X_POSITION_ADDR: u16 = 0xFF4B;
 
@@ -114,7 +122,7 @@ impl<M: Memory + Clone> PPU<M> {
             for (y, byte_addresses) in tile.chunks_exact(2).enumerate() {
                 let low = self.memory.read_memory(byte_addresses[0]);
                 let high = self.memory.read_memory(byte_addresses[1]);
-                let pixels = fetcher::byte_pair_to_pixels(low, high, PixelSource::BackgroundWindow);
+                let pixels = byte_pair_to_pixels(low, high, PixelSource::BackgroundWindow);
 
                 for (x, pixel) in pixels.iter().enumerate() {
                     let screen_color = pixel_color_to_screen_color(pixel.color);
@@ -203,10 +211,12 @@ impl<M: Memory + Clone> PPU<M> {
         }
 
         match self.state {
-            PPUState::OAMSearchInit => {}
+            PPUState::OAMSearchInit => {
+                self.pixel_fifo.begin_of_line(self.scan_line);
+            }
             PPUState::OAMSearch => {}
             PPUState::TransferInit => {
-                self.pixel_fifo.begin_of_line(self.scan_line);
+                self.pixel_fifo.begin_lcd_transfer();
             }
             PPUState::Transfer { x } => {
                 assert!(x < 160);
@@ -215,8 +225,7 @@ impl<M: Memory + Clone> PPU<M> {
 
                 let offset = (self.scan_line as usize) * (SCREEN_WIDTH as usize) + (x as usize);
 
-                let bg_palette = self.memory.read_memory(BG_PALETTE_DATA_ADDR);
-                let actual_color = (bg_palette >> (pixel.color * 2)) & 0b11;
+                let actual_color = pixel.through_palette(&self.memory);
 
                 self.frame[offset] = actual_color;
             }
