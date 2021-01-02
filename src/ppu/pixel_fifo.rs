@@ -191,19 +191,14 @@ impl<M: Memory> PixelFIFO<M> {
             });
         }
 
-        let mut current_oam = None;
         for oam in &self.objects {
             if self.current_x + 8 == oam.x_pos {
-                current_oam = Some(oam);
-            }
-        }
-
-        if let Some(oam) = current_oam {
-            let in_oam_y = self.current_scan_line + 16 - oam.y_pos;
-            let pixels = oam.get_pixels(&self.memory, in_oam_y);
-            for i in 0..8 {
-                if self.oam_fifo[i].color == 0 {
-                    self.oam_fifo[i] = pixels[i];
+                let in_oam_y = self.current_scan_line + 16 - oam.y_pos;
+                let pixels = oam.get_pixels(&self.memory, in_oam_y);
+                for i in 0..8 {
+                    if self.oam_fifo[i].color == 0 {
+                        self.oam_fifo[i] = pixels[i];
+                    }
                 }
             }
         }
