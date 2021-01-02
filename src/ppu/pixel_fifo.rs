@@ -124,7 +124,9 @@ impl<M: Memory> PixelFIFO<M> {
         self.current_scan_line = scan_line;
         self.background_fifo.clear();
         self.oam_fifo.clear();
+    }
 
+    pub fn end_of_oam_search(&mut self) {
         self.find_oams();
     }
 

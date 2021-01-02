@@ -94,7 +94,7 @@ impl<M: Memory + Clone> PPU<M> {
 
             scan_line: 0,
             dot_in_line: 0,
-            state: PPUState::OAMSearchInit,
+            state: PPUState::OAMSearchBegin,
             int_cond_met: false,
 
             previous_frame: [0; PIXEL_COUNT],
@@ -211,10 +211,13 @@ impl<M: Memory + Clone> PPU<M> {
         }
 
         match self.state {
-            PPUState::OAMSearchInit => {
+            PPUState::OAMSearchBegin => {
                 self.pixel_fifo.begin_of_line(self.scan_line);
             }
             PPUState::OAMSearch => {}
+            PPUState::OAMSearchEnd => {
+                self.pixel_fifo.end_of_oam_search();
+            }
             PPUState::TransferInit => {
                 self.pixel_fifo.begin_lcd_transfer();
             }
@@ -266,8 +269,9 @@ pub enum Mode {
 
 #[derive(Debug, Clone)]
 enum PPUState {
-    OAMSearchInit,
+    OAMSearchBegin,
     OAMSearch,
+    OAMSearchEnd,
     TransferInit,
     Transfer { x: u8 },
     PostTransfer,
@@ -277,12 +281,6 @@ enum PPUState {
     VBlank,
 }
 
-impl Default for PPUState {
-    fn default() -> Self {
-        PPUState::OAMSearchInit
-    }
-}
-
 impl PPUState {
     fn current_state(dot: u32, scan_line: u8) -> Self {
         assert!(scan_line < SCAN_LINE_COUNT);
@@ -290,8 +288,9 @@ impl PPUState {
 
         if scan_line < SCREEN_HEIGHT {
             match dot {
-                0 => PPUState::OAMSearchInit,
-                1..=79 => PPUState::OAMSearch,
+                0 => PPUState::OAMSearchBegin,
+                1..=78 => PPUState::OAMSearch,
+                79 => PPUState::OAMSearchEnd,
                 80 => PPUState::TransferInit,
                 81..=240 => PPUState::Transfer { x: dot as u8 - 81 },
                 241..=251 => PPUState::PostTransfer,
@@ -308,8 +307,9 @@ impl PPUState {
 
     fn mode(&self) -> Mode {
         match self {
-            PPUState::OAMSearchInit => Mode::OAMSearch,
+            PPUState::OAMSearchBegin => Mode::OAMSearch,
             PPUState::OAMSearch => Mode::OAMSearch,
+            PPUState::OAMSearchEnd => Mode::OAMSearch,
             PPUState::TransferInit => Mode::LCDTransfer,
             PPUState::Transfer { .. } => Mode::LCDTransfer,
             PPUState::PostTransfer => Mode::LCDTransfer,
