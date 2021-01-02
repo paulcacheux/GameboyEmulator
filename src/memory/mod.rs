@@ -1,6 +1,6 @@
 use std::{rc::Rc, sync::RwLock};
 
-use log::debug;
+use log::{debug, warn};
 
 mod mbc1;
 mod simple;
@@ -24,6 +24,9 @@ const JOYPAD_STATUS_ADDR: u16 = 0xFF00;
 
 const SERIAL_TRANSFER_DATA_ADDR: u16 = 0xFF01;
 const SERIAL_TRANSFER_CONTROL_ADDR: u16 = 0xFF02;
+
+const LCD_OAM_DMA_ADDR: u16 = 0xFF46;
+
 const BOOTSTRAP_ROM_MOUNT_CONTROL_ADDR: u16 = 0xFF50;
 
 const DIVIDER_REGISTER_ADDR: u16 = 0xFF04;
@@ -117,6 +120,9 @@ impl MMU {
             self.interrupt_controller.lock().unwrap().interrupt_flag =
                 IntKind::from_bits_truncate(value);
         } else {
+            if addr == LCD_OAM_DMA_ADDR {
+                warn!("Game tried to initiate a DMA transfer");
+            }
             self.io_regs[addr as usize - 0xFF00] = value;
         }
     }
