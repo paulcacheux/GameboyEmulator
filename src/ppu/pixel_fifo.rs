@@ -4,7 +4,7 @@ use crate::memory::Memory;
 
 use super::{
     fetcher::Fetcher,
-    oam::OAM,
+    oam::{OAMSize, OAM},
     pixel::{Pixel, PixelSource},
     LCD_SCROLL_X_ADDR, LCD_SCROLL_Y_ADDR, LCD_WINDOW_X_POSITION_ADDR, LCD_WINDOW_Y_POSITION_ADDR,
 };
@@ -14,6 +14,7 @@ use super::{fetcher::FetcherKind, ControlReg, LCD_CONTROL_REG_ADDR};
 pub struct PixelFIFO<M: Memory> {
     background_window_fetcher: Option<Fetcher<M>>,
     objects: Vec<OAM>,
+    oam_size: OAMSize,
 
     background_fifo: VecDeque<Pixel>,
     oam_fifo: VecDeque<Pixel>,
@@ -29,6 +30,7 @@ impl<M: Memory> PixelFIFO<M> {
         PixelFIFO {
             background_window_fetcher: None,
             objects: Vec::new(),
+            oam_size: OAMSize::_8x8,
 
             background_fifo: VecDeque::new(),
             oam_fifo: VecDeque::new(),
@@ -100,10 +102,20 @@ impl<M: Memory> PixelFIFO<M> {
     }
 
     fn find_oams(&mut self) {
+        self.oam_size = if self.control_reg().contains(ControlReg::OBJ_SIZE) {
+            OAMSize::_8x16
+        } else {
+            OAMSize::_8x8
+        };
+
         for oam_addr in (0xFE00..0xFEA0).step_by(4) {
             let oam = OAM::read_from_memory(&self.memory, oam_addr);
-            if self.objects.len() < 10 && oam.is_y_hitting(self.current_scan_line) {
+            if oam.is_y_hitting(self.current_scan_line, self.oam_size) {
                 self.objects.push(oam);
+            }
+
+            if self.objects.len() >= 10 {
+                break;
             }
         }
     }
@@ -194,7 +206,7 @@ impl<M: Memory> PixelFIFO<M> {
         for oam in &self.objects {
             if self.current_x + 8 == oam.x_pos {
                 let in_oam_y = self.current_scan_line + 16 - oam.y_pos;
-                let pixels = oam.get_pixels(&self.memory, in_oam_y);
+                let pixels = oam.get_pixels(&self.memory, in_oam_y, self.oam_size);
                 for i in 0..8 {
                     if self.oam_fifo[i].color == 0 {
                         self.oam_fifo[i] = pixels[i];

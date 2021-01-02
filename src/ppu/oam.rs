@@ -14,6 +14,21 @@ bitflags! {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OAMSize {
+    _8x8,
+    _8x16,
+}
+
+impl OAMSize {
+    fn height(self) -> u8 {
+        match self {
+            OAMSize::_8x16 => 16,
+            OAMSize::_8x8 => 8,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct OAM {
     pub y_pos: u8,
@@ -37,22 +52,31 @@ impl OAM {
         }
     }
 
-    pub fn is_y_hitting(&self, scan_line: u8) -> bool {
-        self.y_pos <= (scan_line + 16) && (scan_line + 16) < (self.y_pos + 8)
+    pub fn is_y_hitting(&self, scan_line: u8, oam_size: OAMSize) -> bool {
+        self.y_pos <= (scan_line + 16) && (scan_line + 16) < (self.y_pos + oam_size.height())
     }
 
-    pub fn get_pixels(&self, memory: &dyn Memory, in_oam_y: u8) -> [Pixel; 8] {
+    pub fn get_pixels(&self, memory: &dyn Memory, in_oam_y: u8, oam_size: OAMSize) -> [Pixel; 8] {
         let in_tile_y = if self.flags.contains(OAMFlags::Y_FLIP) {
-            7 - in_oam_y
+            oam_size.height() - 1 - in_oam_y
         } else {
             in_oam_y
         };
 
         let palette = self.flags.contains(OAMFlags::PALETTE_NUMBER) as u8;
 
+        let (real_tile_id, in_tile_y) = match oam_size {
+            OAMSize::_8x8 => (self.tile_id, in_tile_y),
+            OAMSize::_8x16 if in_tile_y < 8 => (self.tile_id & 0xFE, in_tile_y),
+            OAMSize::_8x16 if 8 <= in_tile_y && in_tile_y < 16 => {
+                (self.tile_id | 0x01, in_tile_y - 8)
+            }
+            _ => unreachable!(),
+        };
+
         let mut pixels = read_tile_pixels(
             memory,
-            self.tile_id as u16,
+            real_tile_id as u16,
             in_tile_y,
             PixelSource::OAM {
                 palette,
