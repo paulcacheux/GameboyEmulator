@@ -2,6 +2,12 @@ use std::marker::PhantomData;
 
 use crate::memory::Memory;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FetcherKind {
+    Background,
+    Window,
+}
+
 #[derive(Debug, Clone)]
 pub struct Fetcher<M: Memory> {
     map_addr: u16,
@@ -9,11 +15,31 @@ pub struct Fetcher<M: Memory> {
     tile_x: u8,
     tile_y: u8,
     sub_y: u8,
+    pub kind: FetcherKind,
     phantom_data: PhantomData<M>,
 }
 
 impl<M: Memory> Fetcher<M> {
-    pub fn new(
+    pub fn new_window(
+        map_addr: u16,
+        addressing_mode: AddressingMode,
+        window_scan_line: u8,
+    ) -> Self {
+        let tile_y = window_scan_line / 8;
+        let sub_y = window_scan_line % 8;
+
+        Fetcher {
+            map_addr,
+            addressing_mode,
+            tile_x: 0,
+            tile_y,
+            sub_y,
+            kind: FetcherKind::Window,
+            phantom_data: PhantomData,
+        }
+    }
+
+    pub fn new_background(
         map_addr: u16,
         addressing_mode: AddressingMode,
         scroll_x: u8,
@@ -35,6 +61,7 @@ impl<M: Memory> Fetcher<M> {
             tile_x,
             tile_y,
             sub_y,
+            kind: FetcherKind::Background,
             phantom_data: PhantomData,
         }
     }

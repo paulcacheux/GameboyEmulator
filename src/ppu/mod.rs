@@ -19,6 +19,32 @@ bitflags! {
     }
 }
 
+impl ControlReg {
+    pub fn background_tile_map_addr(&self) -> u16 {
+        if self.contains(ControlReg::BG_TILE_MAP_DISPLAY_SELECT) {
+            0x9C00
+        } else {
+            0x9800
+        }
+    }
+
+    pub fn window_tile_map_addr(&self) -> u16 {
+        if self.contains(ControlReg::WINDOW_TILE_MAP_DISPLAY_SELECT) {
+            0x9C00
+        } else {
+            0x9800
+        }
+    }
+
+    pub fn addressing_mode(&self) -> AddressingMode {
+        if self.contains(ControlReg::BG_WINDOW_TILE_DATA_SELECT) {
+            AddressingMode::From8000
+        } else {
+            AddressingMode::From8800
+        }
+    }
+}
+
 pub const SCREEN_WIDTH: u8 = 160;
 pub const SCREEN_HEIGHT: u8 = 144;
 const PIXEL_COUNT: usize = (SCREEN_WIDTH as usize) * (SCREEN_HEIGHT as usize);
@@ -33,6 +59,8 @@ const LCD_SCROLL_X_ADDR: u16 = 0xFF43;
 const LCD_LY_ADDR: u16 = 0xFF44;
 const LCD_LYC_ADDR: u16 = 0xFF45;
 const BG_PALETTE_DATA_ADDR: u16 = 0xFF47;
+const LCD_WINDOW_Y_POSITION_ADDR: u16 = 0xFF4A;
+const LCD_WINDOW_X_POSITION_ADDR: u16 = 0xFF4B;
 
 #[derive(Debug, Clone)]
 pub struct PPU<M: Memory> {
@@ -50,10 +78,10 @@ pub struct PPU<M: Memory> {
     pixel_fifo: PixelFIFO<M>,
 }
 
-impl<M: Memory> PPU<M> {
+impl<M: Memory + Clone> PPU<M> {
     pub fn new(memory: M, interrupt_controller: InterruptControllerPtr) -> Self {
         PPU {
-            memory,
+            memory: memory.clone(),
             interrupt_controller,
 
             scan_line: 0,
@@ -64,7 +92,7 @@ impl<M: Memory> PPU<M> {
             previous_frame: [0; PIXEL_COUNT],
             frame: [0; PIXEL_COUNT],
 
-            pixel_fifo: PixelFIFO::new(),
+            pixel_fifo: PixelFIFO::new(memory),
         }
     }
 
@@ -99,11 +127,6 @@ impl<M: Memory> PPU<M> {
                 }
             }
         }
-    }
-
-    fn control_reg(&self) -> ControlReg {
-        ControlReg::from_bits(self.memory.read_memory(LCD_CONTROL_REG_ADDR))
-            .expect("Failed to read control_reg")
     }
 
     fn update_registers(&mut self) {
@@ -183,16 +206,12 @@ impl<M: Memory> PPU<M> {
             PPUState::OAMSearchInit => {}
             PPUState::OAMSearch => {}
             PPUState::TransferInit => {
-                self.pixel_fifo
-                    .begin_of_line(self.control_reg(), &self.memory, self.scan_line);
-
-                let scroll_x = self.memory.read_memory(LCD_SCROLL_X_ADDR);
-                self.pixel_fifo.pop_first_pixels(scroll_x);
+                self.pixel_fifo.begin_of_line(self.scan_line);
             }
             PPUState::Transfer { x } => {
                 assert!(x < 160);
 
-                let pixel = self.pixel_fifo.next_pixel(&self.memory);
+                let pixel = self.pixel_fifo.next_pixel();
 
                 let offset = (self.scan_line as usize) * (SCREEN_WIDTH as usize) + (x as usize);
 
@@ -206,11 +225,14 @@ impl<M: Memory> PPU<M> {
                 self.pixel_fifo.end_of_line();
             }
             PPUState::HBlank => {}
-            PPUState::VBlankInit => self
-                .interrupt_controller
-                .lock()
-                .unwrap()
-                .trigger_vblank_int(),
+            PPUState::VBlankInit => {
+                self.interrupt_controller
+                    .lock()
+                    .unwrap()
+                    .trigger_vblank_int();
+
+                self.pixel_fifo.end_of_frame();
+            }
             PPUState::VBlank => {}
         }
 
