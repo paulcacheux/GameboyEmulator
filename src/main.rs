@@ -3,13 +3,14 @@ use std::{
     sync::{Mutex, RwLock},
 };
 
+use clap::{App, Arg};
 use interrupt::{InterruptController, Keys};
 use pixels::{Pixels, SurfaceTexture};
 use winit::{
     dpi::LogicalSize,
     event::{ElementState, VirtualKeyCode},
     event_loop::{ControlFlow, EventLoop},
-    window::WindowBuilder,
+    window::{Window, WindowBuilder},
 };
 
 mod cpu;
@@ -34,24 +35,39 @@ const MACHINE_CYCLE_PER_FRAME: u32 = MACHINE_CYCLE_FREQ / 60;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
-    let (bootstrap, rom) = match std::env::args().len() {
-        2 => {
-            let rom_path = std::env::args().nth(1).expect("Failed to get rom path");
-            let rom_content = std::fs::read(&rom_path)?;
-            (None, rom_content)
-        }
-        3 => {
-            let bootstrap_path = std::env::args()
-                .nth(1)
-                .expect("Failed to get bootstrap path");
-            let rom_path = std::env::args().nth(2).expect("Failed to get rom path");
+    let matches = App::new("Gameboy Emulator")
+        .version("0.1")
+        .author("Paul Cacheux <paulcacheux@gmail.com>")
+        .arg(
+            Arg::with_name("TILES_WINDOW")
+                .short("t")
+                .long("tiles")
+                .help("Display the tiles data in a separate window"),
+        )
+        .arg(
+            Arg::with_name("BOOTSTRAP_ROM")
+                .short("b")
+                .long("bootstrap")
+                .value_name("BOOTSTRAP_ROM_PATH")
+                .takes_value(true)
+                .help("Sets the path to a bootstrap rom used to init the Gameboy emulator state."),
+        )
+        .arg(
+            Arg::with_name("ROM_PATH")
+                .required(true)
+                .index(1)
+                .help("Sets the path to the ROM to play on the Gameboy emulator."),
+        )
+        .get_matches();
 
-            let bootstrap_content = std::fs::read(&bootstrap_path)?;
-            let rom_content = std::fs::read(&rom_path)?;
-            (Some(bootstrap_content), rom_content)
-        }
-        _ => panic!("Incorrect arguments"),
+    let bootstrap = if let Some(bootstrap_path) = matches.value_of_os("BOOTSTRAP_ROM") {
+        Some(std::fs::read(bootstrap_path)?)
+    } else {
+        None
     };
+
+    let rom_path = matches.value_of_os("ROM_PATH").unwrap();
+    let rom = std::fs::read(rom_path)?;
 
     let interrupt_controller = Rc::new(Mutex::new(InterruptController::new()));
 
@@ -73,47 +89,63 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let event_loop = EventLoop::new();
 
-    let main_window = {
-        let size = LogicalSize::new(WINDOW_WIDTH as f64, WINDOW_HEIGHT as f64);
-        WindowBuilder::new()
-            .with_title("GameBoy Emulator")
-            .with_inner_size(size)
-            .with_resizable(false)
-            .build(&event_loop)
-            .unwrap()
+    let mut main_window_data = {
+        let window = {
+            let size = LogicalSize::new(WINDOW_WIDTH as f64, WINDOW_HEIGHT as f64);
+            WindowBuilder::new()
+                .with_title("GameBoy Emulator")
+                .with_inner_size(size)
+                .with_resizable(false)
+                .build(&event_loop)
+                .unwrap()
+        };
+
+        let framebuffer = {
+            let window_physical_size = window.inner_size();
+            let surface_texture = SurfaceTexture::new(
+                window_physical_size.width,
+                window_physical_size.height,
+                &window,
+            );
+            Pixels::new(SCREEN_WIDTH as _, SCREEN_HEIGHT as _, surface_texture)?
+        };
+
+        WindowData {
+            window,
+            framebuffer,
+        }
     };
 
-    let tile_data_window = {
-        let size = LogicalSize::new(
-            (TILE_WINDOW_WIDTH * MULTIPLIER) as f64,
-            (TILE_WINDOW_HEIGHT * MULTIPLIER) as f64,
-        );
-        WindowBuilder::new()
-            .with_title("GameBoy Emulator Tiles")
-            .with_inner_size(size)
-            .with_resizable(false)
-            .build(&event_loop)
-            .unwrap()
-    };
+    let mut tiles_window_data = if matches.is_present("TILES_WINDOW") {
+        let window = {
+            let size = LogicalSize::new(
+                (TILE_WINDOW_WIDTH * MULTIPLIER) as f64,
+                (TILE_WINDOW_HEIGHT * MULTIPLIER) as f64,
+            );
+            WindowBuilder::new()
+                .with_title("GameBoy Emulator Tiles")
+                .with_inner_size(size)
+                .with_resizable(false)
+                .build(&event_loop)
+                .unwrap()
+        };
 
-    let mut main_framebuffer = {
-        let window_physical_size = main_window.inner_size();
-        let surface_texture = SurfaceTexture::new(
-            window_physical_size.width,
-            window_physical_size.height,
-            &main_window,
-        );
-        Pixels::new(SCREEN_WIDTH as _, SCREEN_HEIGHT as _, surface_texture)?
-    };
+        let framebuffer = {
+            let window_physical_size = window.inner_size();
+            let surface_texture = SurfaceTexture::new(
+                window_physical_size.width,
+                window_physical_size.height,
+                &window,
+            );
+            Pixels::new(TILE_WINDOW_WIDTH, TILE_WINDOW_HEIGHT, surface_texture)?
+        };
 
-    let mut tiles_framebuffer = {
-        let window_physical_size = tile_data_window.inner_size();
-        let surface_texture = SurfaceTexture::new(
-            window_physical_size.width,
-            window_physical_size.height,
-            &tile_data_window,
-        );
-        Pixels::new(TILE_WINDOW_WIDTH, TILE_WINDOW_HEIGHT, surface_texture)?
+        Some(WindowData {
+            window,
+            framebuffer,
+        })
+    } else {
+        None
     };
 
     event_loop.run(move |event, _, control_flow| {
@@ -122,13 +154,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         *control_flow = ControlFlow::Poll;
 
         match event {
-            Event::RedrawRequested(win_id) if win_id == main_window.id() => {
-                ppu.draw_into_fb(main_framebuffer.get_frame());
-                let _ = main_framebuffer.render();
+            Event::RedrawRequested(win_id) if win_id == main_window_data.window.id() => {
+                ppu.draw_into_fb(main_window_data.framebuffer.get_frame());
+                let _ = main_window_data.framebuffer.render();
             }
-            Event::RedrawRequested(win_id) if win_id == tile_data_window.id() => {
-                ppu.draw_tiles_into_fb(tiles_framebuffer.get_frame());
-                let _ = tiles_framebuffer.render();
+            Event::RedrawRequested(win_id)
+                if Some(win_id) == tiles_window_data.as_ref().map(|d| d.window.id()) =>
+            {
+                if let Some(data) = tiles_window_data.as_mut() {
+                    ppu.draw_tiles_into_fb(data.framebuffer.get_frame());
+                    let _ = data.framebuffer.render();
+                }
             }
             Event::MainEventsCleared => {
                 for _ in 0..MACHINE_CYCLE_PER_FRAME {
@@ -138,8 +174,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 let mut int_cont = interrupt_controller.lock().unwrap();
                 if int_cont.should_redraw {
-                    main_window.request_redraw();
-                    tile_data_window.request_redraw();
+                    main_window_data.window.request_redraw();
+                    if let Some(data) = tiles_window_data.as_ref() {
+                        data.window.request_redraw();
+                    }
                     int_cont.should_redraw = false;
                 }
             }
@@ -199,4 +237,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             _ => {}
         }
     });
+}
+
+struct WindowData {
+    window: Window,
+    framebuffer: Pixels<Window>,
 }
