@@ -1,9 +1,11 @@
 use std::{rc::Rc, sync::RwLock};
 
-use log::{debug, warn};
+use log::{debug, error};
 
+mod dma;
 mod mbc1;
 mod simple;
+use dma::DMAInfo;
 use mbc1::MBC1;
 use simple::Simple as SimpleMBC;
 
@@ -18,6 +20,7 @@ pub struct MMU {
     io_regs: Box<[u8; 0x80]>,
     hram: Box<[u8; 0x7F]>,
     interrupt_controller: InterruptControllerPtr,
+    waiting_dma: Option<DMAInfo>,
 }
 
 const JOYPAD_STATUS_ADDR: u16 = 0xFF00;
@@ -47,6 +50,7 @@ impl MMU {
             io_regs: Box::new([0; 0x80]),
             hram: Box::new([0; 0x7F]),
             interrupt_controller: int_controller,
+            waiting_dma: None,
         };
         mmu.init_default_values();
         mmu
@@ -121,7 +125,11 @@ impl MMU {
                 IntKind::from_bits_truncate(value);
         } else {
             if addr == LCD_OAM_DMA_ADDR {
-                warn!("Game tried to initiate a DMA transfer");
+                if self.waiting_dma.is_some() {
+                    error!("New DMA while another one was running");
+                } else {
+                    self.waiting_dma = Some(DMAInfo::new(value));
+                }
             }
             self.io_regs[addr as usize - 0xFF00] = value;
         }
@@ -178,11 +186,26 @@ impl Memory for MMU {
             }
         }
     }
+
+    fn tick(&mut self) {
+        if let Some(dma_info) = self.waiting_dma.as_mut() {
+            if dma_info.tick() {
+                let start_addr = (dma_info.high_byte_addr as u16) << 8;
+                for offset in 0x00..0xA0 {
+                    let src_addr = start_addr + offset;
+                    let dest_addr = 0xFE00 + offset;
+                    self.write_memory(dest_addr, self.read_memory(src_addr));
+                }
+                self.waiting_dma = None;
+            }
+        }
+    }
 }
 
 pub trait Memory {
     fn read_memory(&self, addr: u16) -> u8;
     fn write_memory(&mut self, addr: u16, value: u8);
+    fn tick(&mut self);
 }
 
 impl<M: Memory> Memory for Rc<RwLock<M>> {
@@ -192,6 +215,10 @@ impl<M: Memory> Memory for Rc<RwLock<M>> {
 
     fn write_memory(&mut self, addr: u16, value: u8) {
         self.write().unwrap().write_memory(addr, value);
+    }
+
+    fn tick(&mut self) {
+        self.write().unwrap().tick();
     }
 }
 

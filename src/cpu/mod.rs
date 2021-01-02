@@ -254,6 +254,8 @@ impl<M: Memory> CPU<M> {
     }
 
     pub fn step(&mut self) {
+        self.memory.tick();
+
         if !self.stoped {
             self.interrupt_controller.lock().unwrap().timer_step(4);
         }
