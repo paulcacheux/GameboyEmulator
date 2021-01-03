@@ -6,4 +6,4 @@ sources:
 
 tasks:
   - test: |
-    cargo test
+      cargo test
