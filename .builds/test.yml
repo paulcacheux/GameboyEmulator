@@ -1,0 +1,9 @@
+image: archlinux
+packages:
+  - rust
+sources:
+  - https://git.sr.ht/~paulcacheux/GameboyEmulator
+
+tasks:
+  - test: |
+    cargo test
