@@ -1,4 +1,4 @@
 /target
-/test_roms
+/dev_test_roms
 *.ppm
 *.output.log

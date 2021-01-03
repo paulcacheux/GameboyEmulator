@@ -13,7 +13,7 @@ fn read_img_file(path: &str) -> image::RgbaImage {
 
 #[test]
 fn test_acid2() {
-    let rom_path = "./test_roms/dmg-acid2.gb";
+    let rom_path = "./test_roms/acid2/dmg-acid2.gb";
     let rom = std::fs::read(rom_path).unwrap();
 
     let interrupt_controller = Arc::new(Mutex::new(InterruptController::new()));
@@ -45,6 +45,6 @@ fn test_acid2() {
 
     let res_img = RgbaImage::from_raw(160, 144, fb).unwrap();
 
-    let expected_img = read_img_file("./test_roms/reference-dmg.png");
+    let expected_img = read_img_file("./test_roms/acid2/reference-dmg.png");
     assert_eq!(res_img, expected_img);
 }
