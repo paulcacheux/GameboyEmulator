@@ -6,6 +6,13 @@ sources:
   - https://git.sr.ht/~paulcacheux/GameboyEmulator
 
 tasks:
+  - build: |
+      cd GameboyEmulator
+      cargo build --release
+
   - test: |
       cd GameboyEmulator
       cargo test
+
+artifacts:
+  - GameboyEmulator/target/release/gameboy_emulator
