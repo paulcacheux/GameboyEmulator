@@ -4,7 +4,13 @@ version = "0.1.0"
 authors = ["Paul Cacheux <paulcacheux@gmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "gbemu"
+path = "src/lib.rs"
+
+[[bin]]
+name = "gameboy_emulator"
+path = "src/driver.rs"
 
 [dependencies]
 log = "0.4.11"

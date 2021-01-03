@@ -6,7 +6,7 @@ use std::{
     time::Instant,
 };
 
-use crate::{cpu::CPU, memory::Memory, ppu::PPU};
+use gbemu::{memory::Memory, CPU, PPU};
 
 const FREQUENCY: u64 = 1 << 20;
 const NANOS_IN_SECOND: u64 = 1_000_000_000;

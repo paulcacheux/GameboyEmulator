@@ -4,8 +4,6 @@ use std::sync::{
 };
 
 use clap::{App, Arg};
-use display::Display;
-use interrupt::{InterruptController, Keys};
 use pixels::{Pixels, SurfaceTexture};
 use winit::{
     dpi::LogicalSize,
@@ -14,16 +12,14 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
-mod cpu;
-mod display;
 mod emu_thread;
-mod interrupt;
-mod memory;
-mod ppu;
-mod utils;
 
-use cpu::CPU;
-use ppu::{PPU, SCREEN_HEIGHT, SCREEN_WIDTH};
+use gbemu::{
+    cpu::CPU,
+    display::Display,
+    interrupt::{InterruptController, Keys},
+    memory, PPU, SCREEN_HEIGHT, SCREEN_WIDTH,
+};
 
 const MULTIPLIER: u32 = 4;
 const WINDOW_WIDTH: u32 = (SCREEN_WIDTH as u32) * MULTIPLIER;
