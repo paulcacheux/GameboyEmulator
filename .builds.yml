@@ -1,6 +1,7 @@
 image: archlinux
 packages:
   - rust
+  - xorg-server
 sources:
   - https://git.sr.ht/~paulcacheux/GameboyEmulator
 
