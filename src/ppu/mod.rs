@@ -1,14 +1,14 @@
-use crate::{interrupt::InterruptControllerPtr, memory::Memory};
+use std::sync::{Arc, Mutex};
+
+use crate::{display::Display, interrupt::InterruptControllerPtr, memory::Memory};
 use bitflags::bitflags;
 
 mod fetcher;
 mod oam;
-mod pixel;
+pub mod pixel;
 mod pixel_fifo;
 use fetcher::*;
 use pixel_fifo::PixelFIFO;
-
-use self::pixel::{byte_pair_to_pixels, PixelSource};
 
 bitflags! {
     pub struct ControlReg: u8 {
@@ -51,7 +51,7 @@ impl ControlReg {
 
 pub const SCREEN_WIDTH: u8 = 160;
 pub const SCREEN_HEIGHT: u8 = 144;
-const PIXEL_COUNT: usize = (SCREEN_WIDTH as usize) * (SCREEN_HEIGHT as usize);
+pub const PIXEL_COUNT: usize = (SCREEN_WIDTH as usize) * (SCREEN_HEIGHT as usize);
 
 const SCAN_LINE_COUNT: u8 = SCREEN_HEIGHT + 10;
 const DOT_PER_LINE_COUNT: u32 = 80 + 172 + 204;
@@ -80,14 +80,18 @@ pub struct PPU<M: Memory> {
     state: PPUState,
     int_cond_met: bool,
 
-    pub previous_frame: [u8; PIXEL_COUNT],
+    display: Arc<Mutex<Display>>,
     pub frame: [u8; PIXEL_COUNT],
 
     pixel_fifo: PixelFIFO<M>,
 }
 
 impl<M: Memory + Clone> PPU<M> {
-    pub fn new(memory: M, interrupt_controller: InterruptControllerPtr) -> Self {
+    pub fn new(
+        memory: M,
+        interrupt_controller: InterruptControllerPtr,
+        display: Arc<Mutex<Display>>,
+    ) -> Self {
         PPU {
             memory: memory.clone(),
             interrupt_controller,
@@ -97,43 +101,10 @@ impl<M: Memory + Clone> PPU<M> {
             state: PPUState::OAMSearchBegin,
             int_cond_met: false,
 
-            previous_frame: [0; PIXEL_COUNT],
+            display,
             frame: [0; PIXEL_COUNT],
 
             pixel_fifo: PixelFIFO::new(memory),
-        }
-    }
-
-    pub fn draw_into_fb(&self, fb: &mut [u8]) {
-        assert_eq!(PIXEL_COUNT * 4, fb.len());
-
-        for (i, pixel) in fb.chunks_exact_mut(4).enumerate() {
-            let color = self.previous_frame[i];
-            pixel.copy_from_slice(&pixel_color_to_screen_color(color));
-        }
-    }
-
-    pub fn draw_tiles_into_fb(&self, fb: &mut [u8]) {
-        let addresses: Vec<u16> = (0x8000..0x9800).collect();
-        for (tile_id, tile) in addresses.chunks_exact(16).enumerate() {
-            let tile_y = tile_id / 20;
-            let tile_x = tile_id % 20;
-
-            for (y, byte_addresses) in tile.chunks_exact(2).enumerate() {
-                let low = self.memory.read_memory(byte_addresses[0]);
-                let high = self.memory.read_memory(byte_addresses[1]);
-                let pixels = byte_pair_to_pixels(low, high, PixelSource::BackgroundWindow);
-
-                for (x, pixel) in pixels.iter().enumerate() {
-                    let screen_color = pixel_color_to_screen_color(pixel.color);
-
-                    let final_y = tile_y * 8 + y;
-                    let final_x = tile_x * 8 + x;
-                    let offset = (final_y * (20 * 8) + final_x) * 4;
-
-                    fb[offset..(offset + 4)].copy_from_slice(&screen_color);
-                }
-            }
         }
     }
 
@@ -196,8 +167,9 @@ impl<M: Memory + Clone> PPU<M> {
     }
 
     fn clear_frame(&mut self) {
-        for (pixel, previous_pixel) in self.frame.iter_mut().zip(self.previous_frame.iter_mut()) {
-            *previous_pixel = *pixel;
+        self.display.lock().unwrap().push_frame(&self.frame);
+
+        for pixel in self.frame.iter_mut() {
             *pixel = 0;
         }
     }
@@ -318,27 +290,5 @@ impl PPUState {
             PPUState::VBlankInit => Mode::VBlank,
             PPUState::VBlank => Mode::VBlank,
         }
-    }
-}
-
-fn pixel_color_to_screen_color(color: u8) -> [u8; 4] {
-    /*
-    // green
-    match color {
-        0 => [150, 182, 15, 255],
-        1 => [135, 167, 15, 255],
-        2 => [46, 95, 46, 255],
-        3 => [15, 54, 15, 255],
-        _ => panic!("Out of range color"),
-    }
-    */
-
-    // gray
-    match color {
-        0 => [255, 255, 255, 255],
-        1 => [169, 169, 169, 255],
-        2 => [84, 84, 84, 255],
-        3 => [0, 0, 0, 255],
-        _ => panic!("Out of range color"),
     }
 }

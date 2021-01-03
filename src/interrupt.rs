@@ -1,8 +1,8 @@
-use std::{rc::Rc, sync::Mutex};
+use std::sync::{Arc, Mutex};
 
 use bitflags::bitflags;
 
-pub type InterruptControllerPtr = Rc<Mutex<InterruptController>>;
+pub type InterruptControllerPtr = Arc<Mutex<InterruptController>>;
 
 bitflags! {
     pub struct IntKind: u8 {

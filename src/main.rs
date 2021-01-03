@@ -1,9 +1,10 @@
-use std::{
-    rc::Rc,
-    sync::{Mutex, RwLock},
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Mutex, RwLock,
 };
 
 use clap::{App, Arg};
+use display::Display;
 use interrupt::{InterruptController, Keys};
 use pixels::{Pixels, SurfaceTexture};
 use winit::{
@@ -14,6 +15,8 @@ use winit::{
 };
 
 mod cpu;
+mod display;
+mod emu_thread;
 mod interrupt;
 mod memory;
 mod ppu;
@@ -28,9 +31,6 @@ const WINDOW_HEIGHT: u32 = (SCREEN_HEIGHT as u32) * MULTIPLIER;
 
 const TILE_WINDOW_WIDTH: u32 = 20 * 8;
 const TILE_WINDOW_HEIGHT: u32 = 20 * 8;
-
-const MACHINE_CYCLE_FREQ: u32 = 1 << 20;
-const MACHINE_CYCLE_PER_FRAME: u32 = MACHINE_CYCLE_FREQ / 60;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
@@ -69,7 +69,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rom_path = matches.value_of_os("ROM_PATH").unwrap();
     let rom = std::fs::read(rom_path)?;
 
-    let interrupt_controller = Rc::new(Mutex::new(InterruptController::new()));
+    let interrupt_controller = Arc::new(Mutex::new(InterruptController::new()));
 
     let mbc = memory::build_mbc(&rom);
     let mut mmu = memory::MMU::new(mbc, interrupt_controller.clone());
@@ -79,13 +79,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         mmu.unmount_bootstrap_rom();
     }
 
-    let memory = Rc::new(RwLock::new(mmu));
+    let memory = Arc::new(RwLock::new(mmu));
+    let display = Arc::new(Mutex::new(Display::new()));
 
     let mut cpu = CPU::new(memory.clone(), interrupt_controller.clone());
     if bootstrap.is_none() {
         cpu.pc = 0x100;
     }
-    let mut ppu = PPU::new(memory.clone(), interrupt_controller.clone());
+    let ppu = PPU::new(
+        memory.clone(),
+        interrupt_controller.clone(),
+        display.clone(),
+    );
+
+    let is_ended = Arc::new(AtomicBool::new(false));
+    let is_ended_emu = is_ended.clone();
+    let _ = std::thread::spawn(move || {
+        emu_thread::run(cpu, ppu, is_ended_emu);
+    });
 
     let event_loop = EventLoop::new();
 
@@ -155,23 +166,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         match event {
             Event::RedrawRequested(win_id) if win_id == main_window_data.window.id() => {
-                ppu.draw_into_fb(main_window_data.framebuffer.get_frame());
+                display
+                    .lock()
+                    .unwrap()
+                    .draw_into_fb(main_window_data.framebuffer.get_frame());
                 let _ = main_window_data.framebuffer.render();
             }
             Event::RedrawRequested(win_id)
                 if Some(win_id) == tiles_window_data.as_ref().map(|d| d.window.id()) =>
             {
                 if let Some(data) = tiles_window_data.as_mut() {
-                    ppu.draw_tiles_into_fb(data.framebuffer.get_frame());
+                    Display::draw_tiles_into_fb(&memory, data.framebuffer.get_frame());
                     let _ = data.framebuffer.render();
                 }
             }
             Event::MainEventsCleared => {
-                for _ in 0..MACHINE_CYCLE_PER_FRAME {
-                    cpu.step();
-                    ppu.step();
-                }
-
                 let mut int_cont = interrupt_controller.lock().unwrap();
                 if int_cont.should_redraw {
                     main_window_data.window.request_redraw();
@@ -233,6 +242,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         _ => {}
                     }
                 }
+            }
+            Event::LoopDestroyed => {
+                is_ended.store(true, Ordering::Relaxed);
             }
             _ => {}
         }

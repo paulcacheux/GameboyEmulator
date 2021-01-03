@@ -1,4 +1,4 @@
-use std::{rc::Rc, sync::RwLock};
+use std::sync::{Arc, RwLock};
 
 use log::{debug, error};
 
@@ -11,9 +11,11 @@ use simple::Simple as SimpleMBC;
 
 use crate::interrupt::{IntKind, InterruptControllerPtr};
 
+pub type BoxMBC = Box<dyn MBC + Send + Sync>;
+
 pub struct MMU {
     bootstrap_rom: Box<[u8; 0x100]>,
-    mbc: Box<dyn MBC>,
+    mbc: BoxMBC,
     vram: Box<[u8; 0x2000]>,
     wram: Box<[u8; 0x2000]>,
     oam: Box<[u8; 0xA0]>,
@@ -40,7 +42,7 @@ const TIMER_CONTROL_ADDR: u16 = 0xFF07;
 const INTERRUPT_FLAG_ADDR: u16 = 0xFF0F;
 
 impl MMU {
-    pub fn new(mbc: Box<dyn MBC>, int_controller: InterruptControllerPtr) -> Self {
+    pub fn new(mbc: BoxMBC, int_controller: InterruptControllerPtr) -> Self {
         let mut mmu = MMU {
             bootstrap_rom: Box::new([0; 0x100]),
             mbc,
@@ -208,7 +210,7 @@ pub trait Memory {
     fn tick(&mut self);
 }
 
-impl<M: Memory> Memory for Rc<RwLock<M>> {
+impl<M: Memory> Memory for Arc<RwLock<M>> {
     fn read_memory(&self, addr: u16) -> u8 {
         self.read().unwrap().read_memory(addr)
     }
@@ -227,7 +229,7 @@ pub trait MBC {
     fn write_memory(&mut self, addr: u16, value: u8);
 }
 
-pub fn build_mbc(content: &[u8]) -> Box<dyn MBC> {
+pub fn build_mbc(content: &[u8]) -> BoxMBC {
     const CARTRIDGE_TYPE_ADDR: usize = 0x0147;
     const CARTRIDGE_ROM_SIZE_ADDR: usize = 0x0148;
     const CARTRIDGE_RAM_SIZE_ADDR: usize = 0x0149;
