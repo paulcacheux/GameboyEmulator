@@ -6,4 +6,5 @@ sources:
 
 tasks:
   - test: |
+      cd GameboyEmulator
       cargo test
