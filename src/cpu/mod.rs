@@ -147,6 +147,10 @@ impl<M: Memory> CPU<M> {
         }
     }
 
+    pub fn is_pipeline_empty(&self) -> bool {
+        self.pipeline.is_empty()
+    }
+
     pub fn fetch_and_advance(&mut self) -> u8 {
         let byte = self.memory.read_memory(self.pc);
         self.pc += 1;
