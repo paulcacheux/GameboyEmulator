@@ -1,9 +1,7 @@
-use std::sync::{Arc, Mutex, RwLock};
-
-use gbemu::{
-    display::Display, interrupt::InterruptController, memory, ppu::PIXEL_COUNT, Memory, CPU, PPU,
-};
+use gbemu::{ppu::PIXEL_COUNT, Memory};
 use image::RgbaImage;
+
+mod common;
 
 fn read_img_file(path: &str) -> image::RgbaImage {
     let img = image::open(path).unwrap();
@@ -14,34 +12,16 @@ fn read_img_file(path: &str) -> image::RgbaImage {
 #[test]
 fn test_acid2() {
     let rom_path = "./test_roms/acid2/dmg-acid2.gb";
-    let rom = std::fs::read(rom_path).unwrap();
+    let mut emu = common::setup_rom(rom_path);
 
-    let interrupt_controller = Arc::new(Mutex::new(InterruptController::new()));
-
-    let mbc = memory::build_mbc(&rom);
-    let mut mmu = memory::MMU::new(mbc, interrupt_controller.clone());
-    mmu.unmount_bootstrap_rom();
-
-    let memory = Arc::new(RwLock::new(mmu));
-    let display = Arc::new(Mutex::new(Display::new()));
-
-    let mut cpu = CPU::new(memory.clone(), interrupt_controller.clone());
-    cpu.pc = 0x100;
-
-    let mut ppu = PPU::new(
-        memory.clone(),
-        interrupt_controller.clone(),
-        display.clone(),
-    );
-
-    while memory.read_memory(cpu.pc) != 0x40 || !cpu.is_pipeline_empty() {
+    while emu.memory.read_memory(emu.cpu.pc) != 0x40 || !emu.cpu.is_pipeline_empty() {
         // breakpoint at LD B, B
-        cpu.step();
-        ppu.step();
+        emu.cpu.step();
+        emu.ppu.step();
     }
 
     let mut fb = vec![0; PIXEL_COUNT * 4];
-    display.lock().unwrap().draw_into_fb(&mut fb);
+    emu.display.lock().unwrap().draw_into_fb(&mut fb);
 
     let res_img = RgbaImage::from_raw(160, 144, fb).unwrap();
 
