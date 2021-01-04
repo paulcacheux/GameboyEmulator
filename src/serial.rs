@@ -1,9 +1,6 @@
-use std::{
-    io::{stdout, Write},
-    sync::{Arc, Mutex},
-};
+use std::io::{stdout, Write};
 
-pub type SerialPtr = Arc<Mutex<Box<dyn SerialWrite + Send + Sync>>>;
+pub type SerialPtr = Box<dyn SerialWrite + Send + Sync>;
 
 pub trait SerialWrite {
     fn write_byte(&mut self, byte: u8);

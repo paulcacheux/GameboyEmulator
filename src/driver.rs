@@ -73,7 +73,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut mmu = memory::MMU::new(
         mbc,
         interrupt_controller.clone(),
-        Arc::new(Mutex::new(Box::new(StdoutSerialWrite))),
+        Box::new(StdoutSerialWrite),
     );
     if let Some(bootstrap) = &bootstrap {
         mmu.write_bootstrap_rom(bootstrap);

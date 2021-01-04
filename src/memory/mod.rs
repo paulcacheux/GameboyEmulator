@@ -172,7 +172,7 @@ impl Memory for MMU {
         // Used for test roms output
         if addr == SERIAL_TRANSFER_CONTROL_ADDR && value == 0x81 {
             let byte = self.read_memory(SERIAL_TRANSFER_DATA_ADDR);
-            self.serial.lock().unwrap().write_byte(byte);
+            self.serial.write_byte(byte);
         }
 
         match addr {

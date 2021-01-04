@@ -23,7 +23,7 @@ pub fn setup_rom(rom_path: &str, serial: Option<SerialPtr>) -> EmuComponents {
     let rom = std::fs::read(rom_path).unwrap();
 
     let interrupt_controller = Arc::new(Mutex::new(InterruptController::new()));
-    let serial = serial.unwrap_or_else(|| Arc::new(Mutex::new(Box::new(StdoutSerialWrite))));
+    let serial = serial.unwrap_or_else(|| Box::new(StdoutSerialWrite));
 
     let mbc = memory::build_mbc(&rom);
     let mut mmu = memory::MMU::new(mbc, interrupt_controller.clone(), serial);

@@ -28,9 +28,7 @@ const EXPECTED_OUTPUT: &str = "cpu_instrs\n\n01:ok  02:ok  03:ok  04:ok  05:ok  
 fn test_blargg_cpu_instrs() {
     let rom_path = "./test_roms/blargg/cpu_instrs.gb";
     let output_content = Arc::new(Mutex::new(String::new()));
-    let serial: SerialPtr = Arc::new(Mutex::new(Box::new(SerialDebug::new(
-        output_content.clone(),
-    ))));
+    let serial: SerialPtr = Box::new(SerialDebug::new(output_content.clone()));
     let mut emu = common::setup_rom(rom_path, Some(serial));
 
     let start_time = std::time::Instant::now();
