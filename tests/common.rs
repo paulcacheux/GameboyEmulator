@@ -4,6 +4,7 @@ use gbemu::{
     display::Display,
     interrupt::{InterruptController, InterruptControllerPtr},
     memory::{self, MMU},
+    serial::StdoutSerialWrite,
     CPU, PPU,
 };
 
@@ -24,7 +25,11 @@ pub fn setup_rom(rom_path: &str) -> EmuComponents {
     let interrupt_controller = Arc::new(Mutex::new(InterruptController::new()));
 
     let mbc = memory::build_mbc(&rom);
-    let mut mmu = memory::MMU::new(mbc, interrupt_controller.clone());
+    let mut mmu = memory::MMU::new(
+        mbc,
+        interrupt_controller.clone(),
+        Arc::new(Mutex::new(Box::new(StdoutSerialWrite))),
+    );
     mmu.unmount_bootstrap_rom();
 
     let memory = Arc::new(RwLock::new(mmu));

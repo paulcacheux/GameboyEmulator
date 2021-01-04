@@ -18,7 +18,9 @@ use gbemu::{
     cpu::CPU,
     display::Display,
     interrupt::{InterruptController, Keys},
-    memory, PPU, SCREEN_HEIGHT, SCREEN_WIDTH,
+    memory,
+    serial::StdoutSerialWrite,
+    PPU, SCREEN_HEIGHT, SCREEN_WIDTH,
 };
 
 const MULTIPLIER: u32 = 4;
@@ -68,7 +70,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let interrupt_controller = Arc::new(Mutex::new(InterruptController::new()));
 
     let mbc = memory::build_mbc(&rom);
-    let mut mmu = memory::MMU::new(mbc, interrupt_controller.clone());
+    let mut mmu = memory::MMU::new(
+        mbc,
+        interrupt_controller.clone(),
+        Arc::new(Mutex::new(Box::new(StdoutSerialWrite))),
+    );
     if let Some(bootstrap) = &bootstrap {
         mmu.write_bootstrap_rom(bootstrap);
     } else {

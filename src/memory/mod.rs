@@ -9,7 +9,10 @@ use dma::DMAInfo;
 use mbc1::MBC1;
 use simple::Simple as SimpleMBC;
 
-use crate::interrupt::{IntKind, InterruptControllerPtr};
+use crate::{
+    interrupt::{IntKind, InterruptControllerPtr},
+    serial::SerialPtr,
+};
 
 pub type BoxMBC = Box<dyn MBC + Send + Sync>;
 
@@ -21,6 +24,7 @@ pub struct MMU {
     oam: Box<[u8; 0xA0]>,
     io_regs: Box<[u8; 0x80]>,
     hram: Box<[u8; 0x7F]>,
+    serial: SerialPtr,
     interrupt_controller: InterruptControllerPtr,
     waiting_dma: Option<DMAInfo>,
 }
@@ -42,7 +46,7 @@ const TIMER_CONTROL_ADDR: u16 = 0xFF07;
 const INTERRUPT_FLAG_ADDR: u16 = 0xFF0F;
 
 impl MMU {
-    pub fn new(mbc: BoxMBC, int_controller: InterruptControllerPtr) -> Self {
+    pub fn new(mbc: BoxMBC, int_controller: InterruptControllerPtr, serial: SerialPtr) -> Self {
         let mut mmu = MMU {
             bootstrap_rom: Box::new([0; 0x100]),
             mbc,
@@ -51,6 +55,7 @@ impl MMU {
             oam: Box::new([0; 0xA0]),
             io_regs: Box::new([0; 0x80]),
             hram: Box::new([0; 0x7F]),
+            serial,
             interrupt_controller: int_controller,
             waiting_dma: None,
         };
@@ -166,7 +171,8 @@ impl Memory for MMU {
     fn write_memory(&mut self, addr: u16, value: u8) {
         // Used for test roms output
         if addr == SERIAL_TRANSFER_CONTROL_ADDR && value == 0x81 {
-            print!("{}", self.read_memory(SERIAL_TRANSFER_DATA_ADDR) as char);
+            let byte = self.read_memory(SERIAL_TRANSFER_DATA_ADDR);
+            self.serial.lock().unwrap().write_byte(byte);
         }
 
         match addr {

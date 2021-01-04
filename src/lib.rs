@@ -3,6 +3,7 @@ pub mod display;
 pub mod interrupt;
 pub mod memory;
 pub mod ppu;
+pub mod serial;
 pub mod utils;
 
 pub use cpu::CPU;
