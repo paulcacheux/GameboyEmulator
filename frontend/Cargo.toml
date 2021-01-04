@@ -1,0 +1,16 @@
+[package]
+name = "gameboy_emulator"
+version = "0.1.0"
+authors = ["Paul Cacheux <paulcacheux@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+gbemu = { path = "../backend" }
+log = "0.4.11"
+env_logger = "0.8.2"
+winit = "0.24.0"
+pixels = "0.2.0"
+clap = "2.33.3"
+
+[dev-dependencies]
+image = "0.23.12"

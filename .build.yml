@@ -12,7 +12,7 @@ tasks:
 
   - test: |
       cd GameboyEmulator
-      cargo test
+      cargo test -p gbemu
 
 artifacts:
   - GameboyEmulator/target/release/gameboy_emulator
