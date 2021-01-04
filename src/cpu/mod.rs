@@ -389,10 +389,10 @@ impl<M: Memory> CPU<M> {
                         }
                     } else {
                         if self.flags.contains(Flags::HALF_CARRY) {
-                            a = (a - 6) & 0xFF;
+                            a = (a.wrapping_sub(6)) & 0xFF;
                         }
                         if self.flags.contains(Flags::CARRY) {
-                            a -= 0x60;
+                            a = a.wrapping_sub(0x60);
                         }
                     }
 
