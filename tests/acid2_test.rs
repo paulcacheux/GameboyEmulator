@@ -12,7 +12,7 @@ fn read_img_file(path: &str) -> image::RgbaImage {
 #[test]
 fn test_acid2() {
     let rom_path = "./test_roms/acid2/dmg-acid2.gb";
-    let mut emu = common::setup_rom(rom_path);
+    let mut emu = common::setup_rom(rom_path, None);
 
     while emu.memory.read_memory(emu.cpu.pc) != 0x40 || !emu.cpu.is_pipeline_empty() {
         // breakpoint at LD B, B
