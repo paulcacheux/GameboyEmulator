@@ -4,7 +4,7 @@ use gbemu::{
     display::Display,
     interrupt::{InterruptController, InterruptControllerPtr},
     memory::{self, MMU},
-    serial::StdoutSerialWrite,
+    serial::{SerialPtr, StdoutSerialWrite},
     CPU, PPU,
 };
 
@@ -19,17 +19,14 @@ pub struct EmuComponents {
     pub display: DisplayPtr,
 }
 
-pub fn setup_rom(rom_path: &str) -> EmuComponents {
+pub fn setup_rom(rom_path: &str, serial: Option<SerialPtr>) -> EmuComponents {
     let rom = std::fs::read(rom_path).unwrap();
 
     let interrupt_controller = Arc::new(Mutex::new(InterruptController::new()));
+    let serial = serial.unwrap_or_else(|| Arc::new(Mutex::new(Box::new(StdoutSerialWrite))));
 
     let mbc = memory::build_mbc(&rom);
-    let mut mmu = memory::MMU::new(
-        mbc,
-        interrupt_controller.clone(),
-        Arc::new(Mutex::new(Box::new(StdoutSerialWrite))),
-    );
+    let mut mmu = memory::MMU::new(mbc, interrupt_controller.clone(), serial);
     mmu.unmount_bootstrap_rom();
 
     let memory = Arc::new(RwLock::new(mmu));
