@@ -86,7 +86,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut cpu = CPU::new(memory.clone(), interrupt_controller.clone());
     if bootstrap.is_none() {
-        cpu.pc = 0x100;
+        cpu.manual_bootstrap();
     }
     let ppu = PPU::new(
         memory.clone(),
