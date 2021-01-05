@@ -8,5 +8,7 @@ edition = "2018"
 log = "0.4.11"
 bitflags = "1.2.1"
 
-[dev-dependencies]
-image = "0.23.12"
+[dev-dependencies.image]
+default-features = false
+features = ["png"]
+version = "0.23.12"
