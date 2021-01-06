@@ -28,7 +28,7 @@ bitflags! {
 }
 
 #[repr(usize)]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Keys {
     Up = 0,
     Down,
@@ -183,8 +183,8 @@ impl InterruptController {
     }
 
     pub fn change_key_state(&mut self, key: Keys, pressed: bool) {
-        self.keys_state[key as usize] = pressed;
-        if pressed {
+        let old_key_state = std::mem::replace(&mut self.keys_state[key as usize], pressed);
+        if pressed && !old_key_state {
             self.trigger_joypad_int();
         }
     }
