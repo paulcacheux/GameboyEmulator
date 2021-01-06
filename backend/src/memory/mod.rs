@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 
-use log::{debug, error};
+use log::{debug, warn};
 
 mod dma;
 mod mbc1;
@@ -92,53 +92,47 @@ impl MMU {
     }
 
     pub fn read_io_reg(&self, addr: u16) -> u8 {
-        if addr == JOYPAD_STATUS_ADDR {
-            self.interrupt_controller.lock().unwrap().read_joypad_reg()
-        } else if addr == DIVIDER_REGISTER_ADDR {
-            self.interrupt_controller.lock().unwrap().divider_register
-        } else if addr == TIMER_COUNTER_ADDR {
-            self.interrupt_controller.lock().unwrap().timer_counter
-        } else if addr == TIMER_MODULO_ADDR {
-            self.interrupt_controller.lock().unwrap().timer_modulo
-        } else if addr == TIMER_CONTROL_ADDR {
-            self.interrupt_controller.lock().unwrap().timer_control
-        } else if addr == INTERRUPT_FLAG_ADDR {
-            self.interrupt_controller
+        match addr {
+            JOYPAD_STATUS_ADDR => self.interrupt_controller.lock().unwrap().read_joypad_reg(),
+            DIVIDER_REGISTER_ADDR => self.interrupt_controller.lock().unwrap().divider_register,
+            TIMER_COUNTER_ADDR => self.interrupt_controller.lock().unwrap().timer_counter,
+            TIMER_MODULO_ADDR => self.interrupt_controller.lock().unwrap().timer_modulo,
+            TIMER_CONTROL_ADDR => self.interrupt_controller.lock().unwrap().timer_control,
+            INTERRUPT_FLAG_ADDR => self
+                .interrupt_controller
                 .lock()
                 .unwrap()
                 .interrupt_flag
-                .bits()
-        } else {
-            self.io_regs[addr as usize - 0xFF00]
+                .bits(),
+            _ => self.io_regs[addr as usize - 0xFF00],
         }
     }
 
     pub fn write_io_reg(&mut self, addr: u16, value: u8) {
-        if addr == JOYPAD_STATUS_ADDR {
-            self.interrupt_controller
+        match addr {
+            JOYPAD_STATUS_ADDR => self
+                .interrupt_controller
                 .lock()
                 .unwrap()
-                .write_joypad_reg(value)
-        } else if addr == DIVIDER_REGISTER_ADDR {
-            self.interrupt_controller.lock().unwrap().divider_register = 0;
-        } else if addr == TIMER_COUNTER_ADDR {
-            self.interrupt_controller.lock().unwrap().timer_counter = value;
-        } else if addr == TIMER_MODULO_ADDR {
-            self.interrupt_controller.lock().unwrap().timer_modulo = value;
-        } else if addr == TIMER_CONTROL_ADDR {
-            self.interrupt_controller.lock().unwrap().timer_control = value;
-        } else if addr == INTERRUPT_FLAG_ADDR {
-            self.interrupt_controller.lock().unwrap().interrupt_flag =
-                IntKind::from_bits_truncate(value);
-        } else {
-            if addr == LCD_OAM_DMA_ADDR {
-                if self.waiting_dma.is_some() {
-                    error!("New DMA while another one was running");
-                } else {
-                    self.waiting_dma = Some(DMAInfo::new(value));
-                }
+                .write_joypad_reg(value),
+            DIVIDER_REGISTER_ADDR => self.interrupt_controller.lock().unwrap().divider_register = 0,
+            TIMER_COUNTER_ADDR => self.interrupt_controller.lock().unwrap().timer_counter = value,
+            TIMER_MODULO_ADDR => self.interrupt_controller.lock().unwrap().timer_modulo = value,
+            TIMER_CONTROL_ADDR => self.interrupt_controller.lock().unwrap().timer_control = value,
+            INTERRUPT_FLAG_ADDR => {
+                self.interrupt_controller.lock().unwrap().interrupt_flag =
+                    IntKind::from_bits_truncate(value)
             }
-            self.io_regs[addr as usize - 0xFF00] = value;
+            _ => {
+                if addr == LCD_OAM_DMA_ADDR {
+                    if self.waiting_dma.is_some() {
+                        warn!("New DMA while another one was running");
+                    } else {
+                        self.waiting_dma = Some(DMAInfo::new(value));
+                    }
+                }
+                self.io_regs[addr as usize - 0xFF00] = value;
+            }
         }
     }
 }
