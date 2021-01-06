@@ -234,7 +234,12 @@ pub fn build_mbc(content: &[u8]) -> BoxMBC {
     const CARTRIDGE_ROM_SIZE_ADDR: usize = 0x0148;
     const CARTRIDGE_RAM_SIZE_ADDR: usize = 0x0149;
 
-    let rom_size = (1 << 15) << content[CARTRIDGE_ROM_SIZE_ADDR];
+    let rom_size_tag = content[CARTRIDGE_ROM_SIZE_ADDR];
+    if rom_size_tag > 0x08 {
+        unimplemented!()
+    }
+
+    let rom_size = (1 << 15) << rom_size_tag;
     assert_eq!(rom_size, content.len());
 
     let ram_size = match content[CARTRIDGE_RAM_SIZE_ADDR] {
