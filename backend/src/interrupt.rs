@@ -63,6 +63,8 @@ pub struct InterruptController {
     keys_state: [bool; Keys::KeysMax as usize],
     select_buttons: bool,
     select_directions: bool,
+
+    pub cgb_mode: bool,
 }
 
 impl InterruptController {
@@ -87,6 +89,8 @@ impl InterruptController {
             keys_state: [false; Keys::KeysMax as usize],
             select_buttons: false,
             select_directions: false,
+
+            cgb_mode: false,
         }
     }
 

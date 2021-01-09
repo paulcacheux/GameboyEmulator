@@ -148,6 +148,19 @@ impl<M: Memory> CPU<M> {
         }
     }
 
+    pub fn is_in_cgb_super_speed_mode(&self) -> bool {
+        self.interrupt_controller.lock().unwrap().cgb_mode
+    }
+
+    pub fn one_or_two_steps(&mut self) {
+        if self.is_in_cgb_super_speed_mode() {
+            self.step();
+            self.step();
+        } else {
+            self.step();
+        }
+    }
+
     pub fn is_pipeline_empty(&self) -> bool {
         self.pipeline.is_empty()
     }
