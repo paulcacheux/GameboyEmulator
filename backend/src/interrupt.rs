@@ -65,6 +65,7 @@ pub struct InterruptController {
     select_directions: bool,
 
     pub cgb_mode: bool,
+    pub requested_new_mode: Option<bool>,
 }
 
 impl InterruptController {
@@ -91,6 +92,7 @@ impl InterruptController {
             select_directions: false,
 
             cgb_mode: false,
+            requested_new_mode: None,
         }
     }
 

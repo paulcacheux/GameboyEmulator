@@ -722,8 +722,14 @@ impl<M: Memory> CPU<M> {
                     self.halted = true;
                 }
                 MicroOp::Stop => {
-                    self.stoped = true;
-                    warn!("CPU stopped pc={:#x}", self.pc);
+                    let mut controller = self.interrupt_controller.lock().unwrap();
+                    if let Some(new_cgb_mode) = controller.requested_new_mode {
+                        controller.cgb_mode = new_cgb_mode;
+                        controller.requested_new_mode = None;
+                    } else {
+                        self.stoped = true;
+                        warn!("CPU stopped pc={:#x}", self.pc);
+                    }
                 }
             }
         }

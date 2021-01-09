@@ -43,6 +43,7 @@ const LCD_OAM_DMA_ADDR: u16 = 0xFF46;
 
 const VRAM_BANK_CONTROL_ADDR: u16 = 0xFF4F;
 const WRAM_BANK_CONTROL_ADDR: u16 = 0xFF70;
+const CGB_MODE_KEY1_ADDR: u16 = 0xFF4D;
 
 const BOOTSTRAP_ROM_MOUNT_CONTROL_ADDR: u16 = 0xFF50;
 
@@ -105,6 +106,7 @@ impl MMU {
         debug_assert!((new_bank_index as usize) < VRAM_BANK_COUNT);
 
         if !self.interrupt_controller.lock().unwrap().cgb_mode {
+            // TODO: should we really be checking that and not another bool ??
             error!("Tried to switch VRAM bank without being in CGB Mode");
         } else {
             self.vram_bank_index = new_bank_index;
@@ -116,6 +118,7 @@ impl MMU {
         debug_assert_ne!(new_bank_index, 0);
 
         if !self.interrupt_controller.lock().unwrap().cgb_mode {
+            // TODO: should we really be checking that and not another bool ??
             error!("Tried to switch WRAM bank without being in CGB Mode");
         } else {
             self.wram_second_bank_index = new_bank_index;
@@ -144,6 +147,12 @@ impl MMU {
                 debug_assert_ne!(self.wram_second_bank_index, 0);
                 (!0b11) | self.wram_second_bank_index
             }
+            CGB_MODE_KEY1_ADDR => {
+                let controller = self.interrupt_controller.lock().unwrap();
+                let mode = controller.cgb_mode as u8;
+                let prepare = controller.requested_new_mode.is_some() as u8;
+                mode << 7 | prepare
+            }
             _ => self.io_regs[addr as usize - 0xFF00],
         }
     }
@@ -170,6 +179,10 @@ impl MMU {
             WRAM_BANK_CONTROL_ADDR => {
                 let index = 0b11 & value;
                 self.switch_wram_bank(if index == 0 { 1 } else { index });
+            }
+            CGB_MODE_KEY1_ADDR => {
+                let new_cgb_mode = (value & 0b1) == 0b1;
+                self.interrupt_controller.lock().unwrap().requested_new_mode = Some(new_cgb_mode);
             }
             _ => {
                 if addr == LCD_OAM_DMA_ADDR {
