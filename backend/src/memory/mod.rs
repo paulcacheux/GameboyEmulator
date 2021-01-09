@@ -16,10 +16,13 @@ use crate::{
 
 pub type BoxMBC = Box<dyn MBC + Send + Sync>;
 
+const VRAM_BANK_COUNT: usize = 2;
+
 pub struct MMU {
     bootstrap_rom: Box<[u8; 0x100]>,
     mbc: BoxMBC,
-    vram: Box<[u8; 0x2000]>,
+    vram: Box<[[u8; 0x2000]; VRAM_BANK_COUNT]>,
+    vram_bank_index: u8,
     wram: Box<[u8; 0x2000]>,
     oam: Box<[u8; 0xA0]>,
     io_regs: Box<[u8; 0x80]>,
@@ -36,6 +39,8 @@ const SERIAL_TRANSFER_CONTROL_ADDR: u16 = 0xFF02;
 
 const LCD_OAM_DMA_ADDR: u16 = 0xFF46;
 
+const VRAM_BANK_CONTROL_ADDR: u16 = 0xFF4F;
+
 const BOOTSTRAP_ROM_MOUNT_CONTROL_ADDR: u16 = 0xFF50;
 
 const DIVIDER_REGISTER_ADDR: u16 = 0xFF04;
@@ -50,7 +55,8 @@ impl MMU {
         let mut mmu = MMU {
             bootstrap_rom: Box::new([0; 0x100]),
             mbc,
-            vram: Box::new([0; 0x2000]),
+            vram: Box::new([[0; 0x2000]; VRAM_BANK_COUNT]),
+            vram_bank_index: 0,
             wram: Box::new([0; 0x2000]),
             oam: Box::new([0; 0xA0]),
             io_regs: Box::new([0; 0x80]),
@@ -104,6 +110,10 @@ impl MMU {
                 .unwrap()
                 .interrupt_flag
                 .bits(),
+            VRAM_BANK_CONTROL_ADDR => {
+                debug_assert!((self.vram_bank_index as usize) < VRAM_BANK_COUNT);
+                0xFE & self.vram_bank_index // bit-0 to index, all other bits to 1
+            }
             _ => self.io_regs[addr as usize - 0xFF00],
         }
     }
@@ -122,6 +132,10 @@ impl MMU {
             INTERRUPT_FLAG_ADDR => {
                 self.interrupt_controller.lock().unwrap().interrupt_flag =
                     IntKind::from_bits_truncate(value)
+            }
+            VRAM_BANK_CONTROL_ADDR => {
+                let index = 0x1 & value;
+                self.vram_bank_index = index;
             }
             _ => {
                 if addr == LCD_OAM_DMA_ADDR {
@@ -142,7 +156,7 @@ impl Memory for MMU {
         match addr {
             0x0000..=0x00FF => self.read_mounted_rom(addr),
             0x0100..=0x7FFF => self.mbc.read_memory(addr),
-            0x8000..=0x9FFF => self.vram[addr as usize - 0x8000],
+            0x8000..=0x9FFF => self.vram[self.vram_bank_index as usize][addr as usize - 0x8000],
             0xA000..=0xBFFF => self.mbc.read_memory(addr),
             0xC000..=0xDFFF => self.wram[addr as usize - 0xC000],
             0xE000..=0xFDFF => self.wram[addr as usize - 0xE000],
@@ -172,7 +186,9 @@ impl Memory for MMU {
         match addr {
             0x0000..=0x00FF => self.write_mounted_rom(addr, value),
             0x0100..=0x7FFF => self.mbc.write_memory(addr, value),
-            0x8000..=0x9FFF => self.vram[addr as usize - 0x8000] = value,
+            0x8000..=0x9FFF => {
+                self.vram[self.vram_bank_index as usize][addr as usize - 0x8000] = value
+            }
             0xA000..=0xBFFF => self.mbc.write_memory(addr, value),
             0xC000..=0xDFFF => self.wram[addr as usize - 0xC000] = value,
             0xE000..=0xFDFF => self.wram[addr as usize - 0xE000] = value,
@@ -187,6 +203,22 @@ impl Memory for MMU {
                     IntKind::from_bits_truncate(value)
             }
         }
+    }
+
+    fn read_vram(&self, addr: u16, bank: u8) -> u8 {
+        debug_assert!(0x8000 <= addr);
+        debug_assert!(addr <= 0x9FFF);
+        debug_assert!((bank as usize) < VRAM_BANK_COUNT);
+
+        self.vram[bank as usize][addr as usize - 0x8000]
+    }
+
+    fn write_vram(&mut self, addr: u16, bank: u8, value: u8) {
+        debug_assert!(0x8000 <= addr);
+        debug_assert!(addr <= 0x9FFF);
+        debug_assert!((bank as usize) < VRAM_BANK_COUNT);
+
+        self.vram[bank as usize][addr as usize - 0x8000] = value;
     }
 
     fn tick(&mut self) {
@@ -207,6 +239,10 @@ impl Memory for MMU {
 pub trait Memory {
     fn read_memory(&self, addr: u16) -> u8;
     fn write_memory(&mut self, addr: u16, value: u8);
+
+    fn read_vram(&self, addr: u16, bank: u8) -> u8;
+    fn write_vram(&mut self, addr: u16, bank: u8, value: u8);
+
     fn tick(&mut self);
 }
 
@@ -217,6 +253,14 @@ impl<M: Memory> Memory for Arc<RwLock<M>> {
 
     fn write_memory(&mut self, addr: u16, value: u8) {
         self.write().unwrap().write_memory(addr, value);
+    }
+
+    fn read_vram(&self, addr: u16, bank: u8) -> u8 {
+        self.read().unwrap().read_vram(addr, bank)
+    }
+
+    fn write_vram(&mut self, addr: u16, bank: u8, value: u8) {
+        self.write().unwrap().write_vram(addr, bank, value);
     }
 
     fn tick(&mut self) {
