@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 
-use log::{debug, warn};
+use log::{debug, error, warn};
 
 mod dma;
 mod mbc1;
@@ -97,6 +97,16 @@ impl MMU {
         self.write_memory(BOOTSTRAP_ROM_MOUNT_CONTROL_ADDR, 1);
     }
 
+    pub fn switch_vram_bank(&mut self, new_bank_index: u8) {
+        assert!((new_bank_index as usize) < VRAM_BANK_COUNT);
+
+        if !self.interrupt_controller.lock().unwrap().cgb_mode {
+            error!("Tried to switch VRAM bank without being in CGB Mode");
+        } else {
+            self.vram_bank_index = new_bank_index;
+        }
+    }
+
     pub fn read_io_reg(&self, addr: u16) -> u8 {
         match addr {
             JOYPAD_STATUS_ADDR => self.interrupt_controller.lock().unwrap().read_joypad_reg(),
@@ -112,7 +122,7 @@ impl MMU {
                 .bits(),
             VRAM_BANK_CONTROL_ADDR => {
                 debug_assert!((self.vram_bank_index as usize) < VRAM_BANK_COUNT);
-                0xFE & self.vram_bank_index // bit-0 to index, all other bits to 1
+                0b1 & self.vram_bank_index // bit-0 to index, all other bits to 1
             }
             _ => self.io_regs[addr as usize - 0xFF00],
         }
@@ -135,7 +145,7 @@ impl MMU {
             }
             VRAM_BANK_CONTROL_ADDR => {
                 let index = 0x1 & value;
-                self.vram_bank_index = index;
+                self.switch_vram_bank(index);
             }
             _ => {
                 if addr == LCD_OAM_DMA_ADDR {
