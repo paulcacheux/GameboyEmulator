@@ -17,13 +17,15 @@ use crate::{
 pub type BoxMBC = Box<dyn MBC + Send + Sync>;
 
 const VRAM_BANK_COUNT: usize = 2;
+const WRAM_BANK_COUNT: usize = 8;
 
 pub struct MMU {
     bootstrap_rom: Box<[u8; 0x100]>,
     mbc: BoxMBC,
     vram: Box<[[u8; 0x2000]; VRAM_BANK_COUNT]>,
     vram_bank_index: u8,
-    wram: Box<[u8; 0x2000]>,
+    wram: Box<[[u8; 0x2000]; WRAM_BANK_COUNT]>,
+    wram_second_bank_index: u8,
     oam: Box<[u8; 0xA0]>,
     io_regs: Box<[u8; 0x80]>,
     hram: Box<[u8; 0x7F]>,
@@ -40,6 +42,7 @@ const SERIAL_TRANSFER_CONTROL_ADDR: u16 = 0xFF02;
 const LCD_OAM_DMA_ADDR: u16 = 0xFF46;
 
 const VRAM_BANK_CONTROL_ADDR: u16 = 0xFF4F;
+const WRAM_BANK_CONTROL_ADDR: u16 = 0xFF70;
 
 const BOOTSTRAP_ROM_MOUNT_CONTROL_ADDR: u16 = 0xFF50;
 
@@ -57,7 +60,8 @@ impl MMU {
             mbc,
             vram: Box::new([[0; 0x2000]; VRAM_BANK_COUNT]),
             vram_bank_index: 0,
-            wram: Box::new([0; 0x2000]),
+            wram: Box::new([[0; 0x2000]; WRAM_BANK_COUNT]),
+            wram_second_bank_index: 0,
             oam: Box::new([0; 0xA0]),
             io_regs: Box::new([0; 0x80]),
             hram: Box::new([0; 0x7F]),
@@ -98,12 +102,23 @@ impl MMU {
     }
 
     pub fn switch_vram_bank(&mut self, new_bank_index: u8) {
-        assert!((new_bank_index as usize) < VRAM_BANK_COUNT);
+        debug_assert!((new_bank_index as usize) < VRAM_BANK_COUNT);
 
         if !self.interrupt_controller.lock().unwrap().cgb_mode {
             error!("Tried to switch VRAM bank without being in CGB Mode");
         } else {
             self.vram_bank_index = new_bank_index;
+        }
+    }
+
+    pub fn switch_wram_bank(&mut self, new_bank_index: u8) {
+        debug_assert!((new_bank_index as usize) < WRAM_BANK_COUNT);
+        debug_assert_ne!(new_bank_index, 0);
+
+        if !self.interrupt_controller.lock().unwrap().cgb_mode {
+            error!("Tried to switch WRAM bank without being in CGB Mode");
+        } else {
+            self.wram_second_bank_index = new_bank_index;
         }
     }
 
@@ -122,7 +137,12 @@ impl MMU {
                 .bits(),
             VRAM_BANK_CONTROL_ADDR => {
                 debug_assert!((self.vram_bank_index as usize) < VRAM_BANK_COUNT);
-                0b1 & self.vram_bank_index // bit-0 to index, all other bits to 1
+                (!0b1) | self.vram_bank_index // bit-0 to index, all other bits to 1
+            }
+            WRAM_BANK_CONTROL_ADDR => {
+                debug_assert!((self.wram_second_bank_index as usize) < WRAM_BANK_COUNT);
+                debug_assert_ne!(self.wram_second_bank_index, 0);
+                (!0b11) | self.wram_second_bank_index
             }
             _ => self.io_regs[addr as usize - 0xFF00],
         }
@@ -147,6 +167,10 @@ impl MMU {
                 let index = 0x1 & value;
                 self.switch_vram_bank(index);
             }
+            WRAM_BANK_CONTROL_ADDR => {
+                let index = 0b11 & value;
+                self.switch_wram_bank(if index == 0 { 1 } else { index });
+            }
             _ => {
                 if addr == LCD_OAM_DMA_ADDR {
                     if self.waiting_dma.is_some() {
@@ -168,8 +192,11 @@ impl Memory for MMU {
             0x0100..=0x7FFF => self.mbc.read_memory(addr),
             0x8000..=0x9FFF => self.vram[self.vram_bank_index as usize][addr as usize - 0x8000],
             0xA000..=0xBFFF => self.mbc.read_memory(addr),
-            0xC000..=0xDFFF => self.wram[addr as usize - 0xC000],
-            0xE000..=0xFDFF => self.wram[addr as usize - 0xE000],
+            0xC000..=0xCFFF => self.wram[0][addr as usize - 0xC000],
+            0xD000..=0xDFFF => {
+                self.wram[self.wram_second_bank_index as usize][addr as usize - 0xC000]
+            }
+            0xE000..=0xFDFF => self.read_memory(addr - 0xE000),
             0xFE00..=0xFE9F => self.oam[addr as usize - 0xFE00],
             0xFEA0..=0xFEFF => {
                 debug!("Unusable space {:#x}", addr);
@@ -200,8 +227,11 @@ impl Memory for MMU {
                 self.vram[self.vram_bank_index as usize][addr as usize - 0x8000] = value
             }
             0xA000..=0xBFFF => self.mbc.write_memory(addr, value),
-            0xC000..=0xDFFF => self.wram[addr as usize - 0xC000] = value,
-            0xE000..=0xFDFF => self.wram[addr as usize - 0xE000] = value,
+            0xC000..=0xCFFF => self.wram[0][addr as usize - 0xC000] = value,
+            0xD000..=0xDFFF => {
+                self.wram[self.wram_second_bank_index as usize][addr as usize - 0xC000] = value
+            }
+            0xE000..=0xFDFF => self.write_memory(addr - 0xE000, value),
             0xFE00..=0xFE9F => self.oam[addr as usize - 0xFE00] = value,
             0xFEA0..=0xFEFF => {
                 debug!("Write to unusable space {:#x}", addr)
