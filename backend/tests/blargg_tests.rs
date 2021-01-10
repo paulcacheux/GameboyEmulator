@@ -36,7 +36,6 @@ fn blargg_test(rom_path: &str, timemout: std::time::Duration, expected_output: &
         && output_content.lock().unwrap().len() < expected_output.len()
     {
         emu.cpu.step();
-        emu.ppu.step();
     }
 
     assert_eq!(output_content.lock().unwrap().as_str(), expected_output);
