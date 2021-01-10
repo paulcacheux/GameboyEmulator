@@ -73,7 +73,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let interrupt_controller = Arc::new(Mutex::new(InterruptController::new()));
 
-    let mbc = memory::build_mbc(&rom);
+    let mbc = gbemu::read_cartridge(&rom);
     let mut mmu = memory::MMU::new(
         mbc,
         interrupt_controller.clone(),

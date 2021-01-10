@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex, RwLock};
 
 use gbemu::{
+    self,
     display::Display,
     interrupt::{InterruptController, InterruptControllerPtr},
     memory::{self, MMU},
@@ -25,7 +26,7 @@ pub fn setup_rom(rom_path: &str, serial: Option<SerialPtr>) -> EmuComponents {
     let interrupt_controller = Arc::new(Mutex::new(InterruptController::new()));
     let serial = serial.unwrap_or_else(|| Box::new(StdoutSerialWrite));
 
-    let mbc = memory::build_mbc(&rom);
+    let mbc = gbemu::read_cartridge(&rom);
     let mut mmu = memory::MMU::new(mbc, interrupt_controller.clone(), serial);
     mmu.unmount_bootstrap_rom();
 
