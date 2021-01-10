@@ -19,7 +19,7 @@ use gbemu::{
     cpu::CPU,
     display::Display,
     interrupt::{InterruptController, Keys},
-    memory,
+    mbc, memory,
     serial::StdoutSerialWrite,
     PPU, SCREEN_HEIGHT, SCREEN_WIDTH,
 };
@@ -73,7 +73,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let interrupt_controller = Arc::new(Mutex::new(InterruptController::new()));
 
-    let mbc = gbemu::read_cartridge(&rom);
+    let mbc = mbc::read_cartridge(&rom);
     let mut mmu = memory::MMU::new(
         mbc,
         interrupt_controller.clone(),

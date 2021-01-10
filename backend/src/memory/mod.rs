@@ -3,16 +3,13 @@ use std::sync::{Arc, RwLock};
 use log::{debug, error, warn};
 
 mod dma;
-pub mod mbc1;
-pub mod simple;
 use dma::DMAInfo;
 
 use crate::{
     interrupt::{IntKind, InterruptControllerPtr},
+    mbc::BoxMBC,
     serial::SerialPtr,
 };
-
-pub type BoxMBC = Box<dyn MBC + Send + Sync>;
 
 const VRAM_BANK_COUNT: usize = 2;
 const WRAM_BANK_COUNT: usize = 8;
@@ -317,9 +314,4 @@ impl<M: Memory> Memory for Arc<RwLock<M>> {
     fn tick(&mut self) {
         self.write().unwrap().tick();
     }
-}
-
-pub trait MBC {
-    fn read_memory(&self, addr: u16) -> u8;
-    fn write_memory(&mut self, addr: u16, value: u8);
 }
