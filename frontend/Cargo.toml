@@ -8,6 +8,9 @@ edition = "2021"
 gbemu = { path = "../backend" }
 log = "0.4.11"
 env_logger = "0.10.1"
-winit = "0.25.0"
-pixels = "0.2.0"
+pixels = "0.13.0"
 clap = "2.33.3"
+
+[dependencies.winit]
+features = ["rwh_05"]
+version = "0.29.0"
