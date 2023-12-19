@@ -1,0 +1,28 @@
+on: push
+
+name: Build
+
+jobs:
+  run:
+    name: Build release binary
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v4
+
+      - name: Cache rust artifacts
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run cargo build
+        run: |
+          cargo build --release
+        env:
+          RUSTFLAGS: "-C target-cpu=native"
