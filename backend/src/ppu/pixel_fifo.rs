@@ -4,7 +4,7 @@ use crate::memory::Memory;
 
 use super::{
     fetcher::Fetcher,
-    oam::{OAMSize, OAM},
+    oam::{OAMSize, Oam},
     pixel::{Pixel, PixelSource},
     LCD_SCROLL_X_ADDR, LCD_SCROLL_Y_ADDR, LCD_WINDOW_X_POSITION_ADDR, LCD_WINDOW_Y_POSITION_ADDR,
 };
@@ -13,7 +13,7 @@ use super::{fetcher::FetcherKind, ControlReg, LCD_CONTROL_REG_ADDR};
 #[derive(Debug, Clone)]
 pub struct PixelFIFO<M: Memory> {
     background_window_fetcher: Option<Fetcher<M>>,
-    objects: Vec<OAM>,
+    objects: Vec<Oam>,
     oam_size: OAMSize,
 
     background_fifo: VecDeque<Pixel>,
@@ -109,7 +109,7 @@ impl<M: Memory> PixelFIFO<M> {
         };
 
         for oam_addr in (0xFE00..0xFEA0).step_by(4) {
-            let oam = OAM::read_from_memory(&self.memory, oam_addr);
+            let oam = Oam::read_from_memory(&self.memory, oam_addr);
             if oam.is_y_hitting(self.current_scan_line, self.oam_size) {
                 self.objects.push(oam);
             }
@@ -209,9 +209,10 @@ impl<M: Memory> PixelFIFO<M> {
             if self.current_x + 8 == oam.x_pos {
                 let in_oam_y = self.current_scan_line + 16 - oam.y_pos;
                 let pixels = oam.get_pixels(&self.memory, in_oam_y, self.oam_size);
-                for i in 0..8 {
+
+                for (i, pixel) in pixels.into_iter().enumerate() {
                     if self.oam_fifo[i].color == 0 {
-                        self.oam_fifo[i] = pixels[i];
+                        self.oam_fifo[i] = pixel;
                     }
                 }
             }
@@ -231,9 +232,7 @@ fn choose_pixel(bg_pixel: Pixel, oam_pixel: Pixel, obj_enable: bool) -> Pixel {
                 source: PixelSource::OAM { bg_priority, .. },
             },
         ) => {
-            if !obj_enable {
-                bg_pixel
-            } else if oam_color == 0 {
+            if !obj_enable || oam_color == 0 {
                 bg_pixel
             } else if !bg_priority {
                 oam_pixel

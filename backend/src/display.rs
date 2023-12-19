@@ -8,13 +8,15 @@ pub struct Display {
     frame: [u8; PIXEL_COUNT],
 }
 
-impl Display {
-    pub fn new() -> Self {
+impl Default for Display {
+    fn default() -> Self {
         Display {
             frame: [0; PIXEL_COUNT],
         }
     }
+}
 
+impl Display {
     pub fn push_frame(&mut self, frame: &[u8]) {
         assert_eq!(frame.len(), self.frame.len());
         self.frame.copy_from_slice(frame);

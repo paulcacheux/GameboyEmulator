@@ -82,7 +82,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let memory = Arc::new(RwLock::new(mmu));
-    let display = Arc::new(Mutex::new(Display::new()));
+    let display = Arc::new(Mutex::new(Display::default()));
 
     let mut cpu = CPU::new(memory.clone(), interrupt_controller.clone());
     if bootstrap.is_none() {

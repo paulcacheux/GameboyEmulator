@@ -17,8 +17,8 @@ impl MBC1 {
     pub fn new(content: &[u8], rom_size: usize, ram_size: usize) -> Self {
         assert_eq!(content.len() % BANK_SIZE, 0);
 
-        let mut rom: Vec<u8> = content.iter().copied().collect();
-        rom.resize(rom_size as usize, 0);
+        let mut rom: Vec<u8> = content.to_vec();
+        rom.resize(rom_size, 0);
 
         let ram = vec![0; ram_size];
 
@@ -53,11 +53,7 @@ impl MBC for MBC1 {
     fn write_memory(&mut self, addr: u16, value: u8) {
         match addr {
             0x0000..=0x1FFF => {
-                if value == 0x0A {
-                    self.ram_enabled = true;
-                } else {
-                    self.ram_enabled = false;
-                }
+                self.ram_enabled = value == 0x0A;
             }
             0x2000..=0x3FFF => {
                 let value = value & 0b11111;

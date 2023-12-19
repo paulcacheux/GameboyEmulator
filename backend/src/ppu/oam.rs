@@ -30,21 +30,21 @@ impl OAMSize {
 }
 
 #[derive(Debug, Clone)]
-pub struct OAM {
+pub struct Oam {
     pub y_pos: u8,
     pub x_pos: u8,
     pub tile_id: u8,
     pub flags: OAMFlags,
 }
 
-impl OAM {
+impl Oam {
     pub fn read_from_memory(memory: &dyn Memory, addr: u16) -> Self {
         let y_pos = memory.read_memory(addr);
         let x_pos = memory.read_memory(addr + 1);
         let tile_id = memory.read_memory(addr + 2);
         let flags = OAMFlags::from_bits_truncate(memory.read_memory(addr + 3));
 
-        OAM {
+        Oam {
             y_pos,
             x_pos,
             tile_id,
@@ -68,9 +68,7 @@ impl OAM {
         let (real_tile_id, in_tile_y) = match oam_size {
             OAMSize::_8x8 => (self.tile_id, in_tile_y),
             OAMSize::_8x16 if in_tile_y < 8 => (self.tile_id & 0xFE, in_tile_y),
-            OAMSize::_8x16 if 8 <= in_tile_y && in_tile_y < 16 => {
-                (self.tile_id | 0x01, in_tile_y - 8)
-            }
+            OAMSize::_8x16 if (8..16).contains(&in_tile_y) => (self.tile_id | 0x01, in_tile_y - 8),
             _ => unreachable!(),
         };
 

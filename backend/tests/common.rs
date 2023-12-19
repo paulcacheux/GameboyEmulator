@@ -30,7 +30,7 @@ pub fn setup_rom(rom_path: &str, serial: Option<SerialPtr>) -> EmuComponents {
     mmu.unmount_bootstrap_rom();
 
     let memory = Arc::new(RwLock::new(mmu));
-    let display = Arc::new(Mutex::new(Display::new()));
+    let display = Arc::new(Mutex::new(Display::default()));
 
     let mut cpu = CPU::new(memory.clone(), interrupt_controller.clone());
     cpu.pc = 0x100;

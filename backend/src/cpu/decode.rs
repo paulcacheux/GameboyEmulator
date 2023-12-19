@@ -11,7 +11,7 @@ pub fn decode_instruction<M: Memory>(cpu: &mut CPU<M>) -> Instruction {
     let opcode = cpu.fetch_and_advance();
 
     match opcode {
-        0x00 => Instruction::NOP,
+        0x00 => Instruction::Nop,
         0x01 => Instruction::LoadLiteralIntoReg16 {
             reg: Register16::BC,
             literal: cpu.fetch_and_advance_u16(),
@@ -117,7 +117,7 @@ pub fn decode_instruction<M: Memory>(cpu: &mut CPU<M>) -> Instruction {
             reg: Register8::H,
             literal: cpu.fetch_and_advance(),
         },
-        0x27 => Instruction::DAA,
+        0x27 => Instruction::Daa,
         0x28 => Instruction::JumpRelative {
             condition: Some(JumpCondition::Zero),
             offset: cpu.fetch_and_advance() as i8,

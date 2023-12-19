@@ -54,7 +54,7 @@ impl From<Register16> for Reg8OrIndirect {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MicroOp {
-    NOP,
+    Nop,
     Move8Bits {
         destination: Destination8Bits,
         source: Source8bits,
@@ -97,7 +97,7 @@ pub enum MicroOp {
     SbcA {
         rhs: Source8bits,
     },
-    DAA,
+    Daa,
     ComplementA,
     WriteMem {
         addr: Register16,

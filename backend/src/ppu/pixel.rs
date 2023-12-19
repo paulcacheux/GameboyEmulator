@@ -55,6 +55,5 @@ pub fn read_tile_pixels(
     let byte1 = memory.read_memory(row_addr);
     let byte2 = memory.read_memory(row_addr + 1);
 
-    let pixels = byte_pair_to_pixels(byte1, byte2, source);
-    pixels
+    byte_pair_to_pixels(byte1, byte2, source)
 }
