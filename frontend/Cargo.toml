@@ -2,7 +2,7 @@
 name = "gameboy_emulator"
 version = "0.1.0"
 authors = ["Paul Cacheux <paulcacheux@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 gbemu = { path = "../backend" }
