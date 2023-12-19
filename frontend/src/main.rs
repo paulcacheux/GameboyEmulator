@@ -3,7 +3,7 @@ use std::sync::{
     Arc, Mutex, RwLock,
 };
 
-use clap::{App, Arg};
+use clap::{Arg, ArgAction, Command};
 use pixels::{Pixels, SurfaceTexture};
 use winit::{
     dpi::LogicalSize,
@@ -34,38 +34,41 @@ const TILE_WINDOW_HEIGHT: u32 = 20 * 8;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
-    let matches = App::new("Gameboy Emulator")
+    let matches = Command::new("Gameboy Emulator")
         .version("0.1")
         .author("Paul Cacheux <paulcacheux@gmail.com>")
         .arg(
-            Arg::with_name("TILES_WINDOW")
-                .short("t")
+            Arg::new("TILES_WINDOW")
+                .short('t')
                 .long("tiles")
+                .action(ArgAction::SetTrue)
                 .help("Display the tiles data in a separate window"),
         )
         .arg(
-            Arg::with_name("BOOTSTRAP_ROM")
-                .short("b")
+            Arg::new("BOOTSTRAP_ROM")
+                .short('b')
                 .long("bootstrap")
                 .value_name("BOOTSTRAP_ROM_PATH")
-                .takes_value(true)
+                .action(ArgAction::Set)
                 .help("Sets the path to a bootstrap rom used to init the Gameboy emulator state."),
         )
         .arg(
-            Arg::with_name("ROM_PATH")
+            Arg::new("ROM_PATH")
                 .required(true)
                 .index(1)
+                .action(ArgAction::Set)
                 .help("Sets the path to the ROM to play on the Gameboy emulator."),
         )
         .get_matches();
 
-    let bootstrap = if let Some(bootstrap_path) = matches.value_of_os("BOOTSTRAP_ROM") {
-        Some(std::fs::read(bootstrap_path)?)
+    let bootstrap = if let Some(mut bootstrap_path) = matches.get_raw("BOOTSTRAP_ROM") {
+        let path = bootstrap_path.next().unwrap();
+        Some(std::fs::read(path)?)
     } else {
         None
     };
 
-    let rom_path = matches.value_of_os("ROM_PATH").unwrap();
+    let rom_path = matches.get_raw("ROM_PATH").unwrap().next().unwrap();
     let rom = std::fs::read(rom_path)?;
 
     let interrupt_controller = Arc::new(Mutex::new(InterruptController::new()));
@@ -130,7 +133,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let mut tiles_window_data = if matches.is_present("TILES_WINDOW") {
+    let mut tiles_window_data = if matches.get_flag("TILES_WINDOW") {
         let window = {
             let size = LogicalSize::new(
                 (TILE_WINDOW_WIDTH * MULTIPLIER) as f64,
