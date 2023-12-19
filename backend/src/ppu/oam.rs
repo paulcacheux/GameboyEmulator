@@ -68,9 +68,7 @@ impl Oam {
         let (real_tile_id, in_tile_y) = match oam_size {
             OAMSize::_8x8 => (self.tile_id, in_tile_y),
             OAMSize::_8x16 if in_tile_y < 8 => (self.tile_id & 0xFE, in_tile_y),
-            OAMSize::_8x16 if (8..16).contains(&in_tile_y)  => {
-                (self.tile_id | 0x01, in_tile_y - 8)
-            }
+            OAMSize::_8x16 if (8..16).contains(&in_tile_y) => (self.tile_id | 0x01, in_tile_y - 8),
             _ => unreachable!(),
         };
 

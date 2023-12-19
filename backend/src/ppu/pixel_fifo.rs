@@ -210,7 +210,7 @@ impl<M: Memory> PixelFIFO<M> {
                 let in_oam_y = self.current_scan_line + 16 - oam.y_pos;
                 let pixels = oam.get_pixels(&self.memory, in_oam_y, self.oam_size);
 
-                for (i, &pixel) in pixels.into_iter().enumerate() {
+                for (i, pixel) in pixels.into_iter().enumerate() {
                     if self.oam_fifo[i].color == 0 {
                         self.oam_fifo[i] = pixel;
                     }
