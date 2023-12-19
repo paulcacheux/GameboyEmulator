@@ -5,7 +5,7 @@ use super::{Destination8Bits, MicroOp, Register16, Register8, Source8bits};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Instruction {
-    NOP,
+    Nop,
     Move {
         dest: Register8,
         src: Register8,
@@ -97,7 +97,7 @@ pub enum Instruction {
     SbcAWithIndirect {
         addr: Register16,
     },
-    DAA,
+    Daa,
     ComplementA,
     WriteReg8ValueAtAddress {
         addr: u16,
@@ -320,7 +320,7 @@ pub enum PrePostOperation {
 impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Instruction::NOP => {
+            Instruction::Nop => {
                 write!(f, "NOP")
             }
             Instruction::Move { dest, src } => {
@@ -407,7 +407,7 @@ impl fmt::Display for Instruction {
             Instruction::SbcAWithIndirect { addr } => {
                 write!(f, "SBC A, ({})", addr)
             }
-            Instruction::DAA => write!(f, "DAA"),
+            Instruction::Daa => write!(f, "DAA"),
             Instruction::ComplementA => write!(f, "CPL"),
             Instruction::WriteReg8ValueAtAddress { addr, reg } => {
                 write!(f, "LD (${:04x}), {}", addr, reg)
@@ -605,11 +605,11 @@ impl fmt::Display for Instruction {
 impl Instruction {
     pub fn to_micro_ops(self) -> Vec<MicroOp> {
         match self {
-            Instruction::NOP => vec![MicroOp::NOP],
+            Instruction::Nop => vec![MicroOp::Nop],
             Instruction::Move { dest, src } => vec![simpl::move_micro_op(dest, src)],
             Instruction::Move16Bits { dest, src } => {
                 vec![
-                    MicroOp::NOP,
+                    MicroOp::Nop,
                     MicroOp::Move16Bits {
                         destination: dest,
                         source: src,
@@ -617,19 +617,19 @@ impl Instruction {
                 ]
             }
             Instruction::LoadLiteralIntoReg8 { reg, literal } => {
-                vec![MicroOp::NOP, simpl::load_literal_into_reg8(literal, reg)]
+                vec![MicroOp::Nop, simpl::load_literal_into_reg8(literal, reg)]
             }
             Instruction::LoadLiteralIntoReg16 { reg, literal } => {
                 vec![
-                    MicroOp::NOP,
+                    MicroOp::Nop,
                     simpl::load_literal_into_reg8(literal as u8, reg.lower_half()),
                     simpl::load_literal_into_reg8((literal >> 8) as u8, reg.higher_half()),
                 ]
             }
             Instruction::LoadAddressOffsetIntoReg16 { dest, base, offset } => {
                 vec![
-                    MicroOp::NOP,
-                    MicroOp::NOP,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
                     MicroOp::AddOffsetToReg16IntoReg16 {
                         dest,
                         rhs: base,
@@ -641,21 +641,21 @@ impl Instruction {
             Instruction::AndAWithReg8 { reg } => vec![MicroOp::AndA { rhs: reg.into() }],
             Instruction::AndAWithLiteral { literal } => {
                 vec![
-                    MicroOp::NOP,
+                    MicroOp::Nop,
                     MicroOp::AndA {
                         rhs: literal.into(),
                     },
                 ]
             }
             Instruction::AndAWithIndirect { addr } => {
-                vec![MicroOp::NOP, MicroOp::AndA { rhs: addr.into() }]
+                vec![MicroOp::Nop, MicroOp::AndA { rhs: addr.into() }]
             }
             Instruction::OrAWithReg8 { reg } => vec![MicroOp::OrA { rhs: reg.into() }],
             Instruction::OrAWithIndirect { addr } => {
-                vec![MicroOp::NOP, MicroOp::OrA { rhs: addr.into() }]
+                vec![MicroOp::Nop, MicroOp::OrA { rhs: addr.into() }]
             }
             Instruction::OrAWithLiteral { literal } => vec![
-                MicroOp::NOP,
+                MicroOp::Nop,
                 MicroOp::OrA {
                     rhs: literal.into(),
                 },
@@ -664,11 +664,11 @@ impl Instruction {
                 vec![MicroOp::XorA { rhs: reg.into() }]
             }
             Instruction::XorAWithIndirect { addr } => {
-                vec![MicroOp::NOP, MicroOp::XorA { rhs: addr.into() }]
+                vec![MicroOp::Nop, MicroOp::XorA { rhs: addr.into() }]
             }
             Instruction::XorAWithLiteral { literal } => {
                 vec![
-                    MicroOp::NOP,
+                    MicroOp::Nop,
                     MicroOp::XorA {
                         rhs: literal.into(),
                     },
@@ -676,24 +676,24 @@ impl Instruction {
             }
             Instruction::AddAWithReg8 { reg } => vec![MicroOp::AddA { rhs: reg.into() }],
             Instruction::AddAWithIndirect { addr } => {
-                vec![MicroOp::NOP, MicroOp::AddA { rhs: addr.into() }]
+                vec![MicroOp::Nop, MicroOp::AddA { rhs: addr.into() }]
             }
             Instruction::AddAWithLiteral { literal } => {
                 vec![
-                    MicroOp::NOP,
+                    MicroOp::Nop,
                     MicroOp::AddA {
                         rhs: literal.into(),
                     },
                 ]
             }
             Instruction::AddHLWithReg { reg } => {
-                vec![MicroOp::NOP, MicroOp::AddHL { rhs: reg }]
+                vec![MicroOp::Nop, MicroOp::AddHL { rhs: reg }]
             }
             Instruction::AddOffsetToReg16 { reg, offset } => {
                 vec![
-                    MicroOp::NOP,
-                    MicroOp::NOP,
-                    MicroOp::NOP,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
                     MicroOp::AddOffsetToReg16IntoReg16 {
                         dest: reg,
                         rhs: reg,
@@ -707,50 +707,50 @@ impl Instruction {
             }
             Instruction::AdcAWithLiteral { literal } => {
                 vec![
-                    MicroOp::NOP,
+                    MicroOp::Nop,
                     MicroOp::AdcA {
                         rhs: literal.into(),
                     },
                 ]
             }
             Instruction::AdcAWithIndirect { addr } => {
-                vec![MicroOp::NOP, MicroOp::AdcA { rhs: addr.into() }]
+                vec![MicroOp::Nop, MicroOp::AdcA { rhs: addr.into() }]
             }
             Instruction::SubAWithReg8 { reg } => {
                 vec![MicroOp::SubA { rhs: reg.into() }]
             }
             Instruction::SubAWithLiteral { literal } => {
                 vec![
-                    MicroOp::NOP,
+                    MicroOp::Nop,
                     MicroOp::SubA {
                         rhs: literal.into(),
                     },
                 ]
             }
             Instruction::SubAWithIndirect { addr } => {
-                vec![MicroOp::NOP, MicroOp::SubA { rhs: addr.into() }]
+                vec![MicroOp::Nop, MicroOp::SubA { rhs: addr.into() }]
             }
             Instruction::SbcAWithReg8 { reg } => {
                 vec![MicroOp::SbcA { rhs: reg.into() }]
             }
             Instruction::SbcAWithLiteral { literal } => {
                 vec![
-                    MicroOp::NOP,
+                    MicroOp::Nop,
                     MicroOp::SbcA {
                         rhs: literal.into(),
                     },
                 ]
             }
             Instruction::SbcAWithIndirect { addr } => {
-                vec![MicroOp::NOP, MicroOp::SbcA { rhs: addr.into() }]
+                vec![MicroOp::Nop, MicroOp::SbcA { rhs: addr.into() }]
             }
-            Instruction::DAA => vec![MicroOp::DAA],
+            Instruction::Daa => vec![MicroOp::Daa],
             Instruction::ComplementA => vec![MicroOp::ComplementA],
             Instruction::WriteReg8ValueAtAddress { addr, reg } => {
                 vec![
-                    MicroOp::NOP,
-                    MicroOp::NOP,
-                    MicroOp::NOP,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
                     MicroOp::Move8Bits {
                         destination: Destination8Bits::Address(addr),
                         source: reg.into(),
@@ -759,9 +759,9 @@ impl Instruction {
             }
             Instruction::WriteReg16ValueAtAddress { addr, reg } => {
                 vec![
-                    MicroOp::NOP,
-                    MicroOp::NOP,
-                    MicroOp::NOP,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
                     MicroOp::Move8Bits {
                         destination: Destination8Bits::Address(addr),
                         source: reg.lower_half().into(),
@@ -774,8 +774,8 @@ impl Instruction {
             }
             Instruction::WriteLiteralAtIndirect { addr, literal } => {
                 vec![
-                    MicroOp::NOP,
-                    MicroOp::NOP,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
                     MicroOp::Move8Bits {
                         destination: Destination8Bits::Indirect(addr),
                         source: literal.into(),
@@ -784,7 +784,7 @@ impl Instruction {
             }
             Instruction::WriteReg8ValueAtIndirect { addr, reg, post_op } => {
                 vec![
-                    MicroOp::NOP,
+                    MicroOp::Nop,
                     MicroOp::WriteMem {
                         addr,
                         reg,
@@ -794,13 +794,13 @@ impl Instruction {
                 ]
             }
             Instruction::WriteReg8ValueAtZeroPageOffsetReg8 { reg_offset, reg } => {
-                vec![MicroOp::NOP, MicroOp::WriteMemZeroPage { reg_offset, reg }]
+                vec![MicroOp::Nop, MicroOp::WriteMemZeroPage { reg_offset, reg }]
             }
 
             Instruction::WriteReg8ValueAtZeroPageOffsetLiteral { lit_offset, reg } => {
                 vec![
-                    MicroOp::NOP,
-                    MicroOp::NOP,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
                     MicroOp::Move8Bits {
                         destination: Destination8Bits::Address(0xFF00 + lit_offset as u16),
                         source: reg.into(),
@@ -808,24 +808,24 @@ impl Instruction {
                 ]
             }
             Instruction::ReadZeroPageOffsetLiteralToReg8 { lit_offset, reg } => vec![
-                MicroOp::NOP,
-                MicroOp::NOP,
+                MicroOp::Nop,
+                MicroOp::Nop,
                 MicroOp::Move8Bits {
                     destination: Destination8Bits::Register(reg),
                     source: Source8bits::Address(0xFF00 + lit_offset as u16),
                 },
             ],
             Instruction::ReadZeroPageOffsetReg8ToReg8 { offset, reg } => vec![
-                MicroOp::NOP,
+                MicroOp::Nop,
                 MicroOp::Move8Bits {
                     destination: Destination8Bits::Register(reg),
                     source: Source8bits::ZeroPageOffsetReg8(offset),
                 },
             ],
             Instruction::ReadAtAddressToReg8 { reg, addr } => vec![
-                MicroOp::NOP,
-                MicroOp::NOP,
-                MicroOp::NOP,
+                MicroOp::Nop,
+                MicroOp::Nop,
+                MicroOp::Nop,
                 MicroOp::Move8Bits {
                     destination: Destination8Bits::Register(reg),
                     source: Source8bits::Address(addr),
@@ -833,11 +833,11 @@ impl Instruction {
             ],
 
             Instruction::ReadIndirectToReg8 { reg, addr, post_op } => {
-                vec![MicroOp::NOP, MicroOp::ReadMem { reg, addr, post_op }]
+                vec![MicroOp::Nop, MicroOp::ReadMem { reg, addr, post_op }]
             }
             Instruction::PushReg16 { reg } => vec![
-                MicroOp::NOP,
-                MicroOp::NOP,
+                MicroOp::Nop,
+                MicroOp::Nop,
                 MicroOp::WriteMem {
                     addr: Register16::SP,
                     reg: reg.higher_half(),
@@ -852,7 +852,7 @@ impl Instruction {
                 },
             ],
             Instruction::PopReg16 { reg } => vec![
-                MicroOp::NOP,
+                MicroOp::Nop,
                 MicroOp::ReadMem {
                     reg: reg.lower_half(),
                     addr: Register16::SP,
@@ -865,47 +865,47 @@ impl Instruction {
                 },
             ],
             Instruction::BitTest { reg, bit } => vec![
-                MicroOp::NOP,
+                MicroOp::Nop,
                 MicroOp::BitTest {
                     reg: reg.into(),
                     bit,
                 },
             ],
             Instruction::ResetBit { reg, bit } => vec![
-                MicroOp::NOP,
+                MicroOp::Nop,
                 MicroOp::ResetBit {
                     reg: reg.into(),
                     bit,
                 },
             ],
             Instruction::SetBit { reg, bit } => vec![
-                MicroOp::NOP,
+                MicroOp::Nop,
                 MicroOp::SetBit {
                     reg: reg.into(),
                     bit,
                 },
             ],
             Instruction::BitTestIndirect { addr, bit } => vec![
-                MicroOp::NOP,
-                MicroOp::NOP,
+                MicroOp::Nop,
+                MicroOp::Nop,
                 MicroOp::BitTest {
                     reg: addr.into(),
                     bit,
                 },
             ],
             Instruction::ResetBitIndirect { addr, bit } => vec![
-                MicroOp::NOP,
-                MicroOp::NOP,
-                MicroOp::NOP,
+                MicroOp::Nop,
+                MicroOp::Nop,
+                MicroOp::Nop,
                 MicroOp::ResetBit {
                     reg: addr.into(),
                     bit,
                 },
             ],
             Instruction::SetBitIndirect { addr, bit } => vec![
-                MicroOp::NOP,
-                MicroOp::NOP,
-                MicroOp::NOP,
+                MicroOp::Nop,
+                MicroOp::Nop,
+                MicroOp::Nop,
                 MicroOp::SetBit {
                     reg: addr.into(),
                     bit,
@@ -916,8 +916,8 @@ impl Instruction {
                     //
                     vec![
                         // TODO: check if this is really the correct order
-                        MicroOp::NOP,
-                        MicroOp::NOP,
+                        MicroOp::Nop,
+                        MicroOp::Nop,
                         MicroOp::CheckFlags {
                             condition: cond,
                             true_ops: vec![
@@ -944,9 +944,9 @@ impl Instruction {
                 } else {
                     vec![
                         // TODO: check if this is really the correct order
-                        MicroOp::NOP,
-                        MicroOp::NOP,
-                        MicroOp::NOP,
+                        MicroOp::Nop,
+                        MicroOp::Nop,
+                        MicroOp::Nop,
                         MicroOp::WriteMem {
                             addr: Register16::SP,
                             reg: Register8::PCHigh,
@@ -969,11 +969,11 @@ impl Instruction {
             Instruction::Return { condition } => {
                 if let Some(cond) = condition {
                     vec![
-                        MicroOp::NOP,
+                        MicroOp::Nop,
                         MicroOp::CheckFlags {
                             condition: cond,
                             true_ops: vec![
-                                MicroOp::NOP,
+                                MicroOp::Nop,
                                 MicroOp::ReadMem {
                                     reg: Register8::PCLow,
                                     addr: Register16::SP,
@@ -990,8 +990,8 @@ impl Instruction {
                     ]
                 } else {
                     vec![
-                        MicroOp::NOP,
-                        MicroOp::NOP,
+                        MicroOp::Nop,
+                        MicroOp::Nop,
                         MicroOp::ReadMem {
                             reg: Register8::PCLow,
                             addr: Register16::SP,
@@ -1007,7 +1007,7 @@ impl Instruction {
             }
             Instruction::ReturnInterrupt => {
                 vec![
-                    MicroOp::NOP,
+                    MicroOp::Nop,
                     MicroOp::ReadMem {
                         reg: Register8::PCLow,
                         addr: Register16::SP,
@@ -1024,7 +1024,7 @@ impl Instruction {
             Instruction::JumpRelative { condition, offset } => {
                 if let Some(cond) = condition {
                     vec![
-                        MicroOp::NOP,
+                        MicroOp::Nop,
                         MicroOp::CheckFlags {
                             condition: cond,
                             true_ops: vec![simpl::jump_relative(offset)],
@@ -1032,26 +1032,26 @@ impl Instruction {
                         },
                     ]
                 } else {
-                    vec![MicroOp::NOP, MicroOp::NOP, simpl::jump_relative(offset)]
+                    vec![MicroOp::Nop, MicroOp::Nop, simpl::jump_relative(offset)]
                 }
             }
             Instruction::JumpAbsolute { condition, addr } => {
                 if let Some(cond) = condition {
                     vec![
-                        MicroOp::NOP,
+                        MicroOp::Nop,
                         MicroOp::CheckFlags {
                             condition: cond,
                             true_ops: vec![
                                 simpl::load_literal_into_reg8(addr as u8, Register8::PCLow),
                                 simpl::load_literal_into_reg8((addr >> 8) as u8, Register8::PCHigh),
                             ],
-                            false_ops: vec![MicroOp::NOP],
+                            false_ops: vec![MicroOp::Nop],
                         },
                     ]
                 } else {
                     vec![
-                        MicroOp::NOP,
-                        MicroOp::NOP,
+                        MicroOp::Nop,
+                        MicroOp::Nop,
                         simpl::load_literal_into_reg8(addr as u8, Register8::PCLow),
                         simpl::load_literal_into_reg8((addr >> 8) as u8, Register8::PCHigh),
                     ]
@@ -1062,7 +1062,7 @@ impl Instruction {
                 source: reg,
             }],
             Instruction::Reset { offset } => vec![
-                MicroOp::NOP,
+                MicroOp::Nop,
                 MicroOp::WriteMem {
                     addr: Register16::SP,
                     reg: Register8::PCHigh,
@@ -1080,27 +1080,27 @@ impl Instruction {
                     literal: offset,
                 },
             ],
-            Instruction::IncReg16 { reg } => vec![MicroOp::NOP, MicroOp::IncReg16 { reg }],
+            Instruction::IncReg16 { reg } => vec![MicroOp::Nop, MicroOp::IncReg16 { reg }],
             Instruction::IncReg8 { reg } => vec![MicroOp::Inc { reg: reg.into() }],
             Instruction::IncIndirect { addr } => {
                 vec![
-                    MicroOp::NOP,
-                    MicroOp::NOP,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
                     MicroOp::Inc { reg: addr.into() },
                 ]
             }
-            Instruction::DecReg16 { reg } => vec![MicroOp::NOP, MicroOp::DecReg16 { reg }],
+            Instruction::DecReg16 { reg } => vec![MicroOp::Nop, MicroOp::DecReg16 { reg }],
             Instruction::DecReg8 { reg } => vec![MicroOp::Dec { reg: reg.into() }],
             Instruction::DecIndirect { addr } => {
                 vec![
-                    MicroOp::NOP,
-                    MicroOp::NOP,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
                     MicroOp::Dec { reg: addr.into() },
                 ]
             }
             Instruction::CompareAWithLiteral { literal } => {
                 vec![
-                    MicroOp::NOP,
+                    MicroOp::Nop,
                     MicroOp::CompareA {
                         rhs: literal.into(),
                     },
@@ -1109,7 +1109,7 @@ impl Instruction {
             Instruction::CompareAWithReg { reg } => vec![MicroOp::CompareA { rhs: reg.into() }],
             Instruction::CompareAWithIndirect { addr } => {
                 vec![
-                    MicroOp::NOP,
+                    MicroOp::Nop,
                     MicroOp::CompareA {
                         rhs: Source8bits::Indirect(addr),
                     },
@@ -1121,7 +1121,7 @@ impl Instruction {
             }],
             Instruction::RotateLeftThroughCarry { reg } => {
                 vec![
-                    MicroOp::NOP,
+                    MicroOp::Nop,
                     MicroOp::RotateLeftThroughCarry {
                         reg: reg.into(),
                         set_zero: true,
@@ -1130,9 +1130,9 @@ impl Instruction {
             }
             Instruction::RotateLeftThroughCarryWithIndirect { addr } => {
                 vec![
-                    MicroOp::NOP,
-                    MicroOp::NOP,
-                    MicroOp::NOP,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
                     MicroOp::RotateLeftThroughCarry {
                         reg: addr.into(),
                         set_zero: true,
@@ -1145,7 +1145,7 @@ impl Instruction {
             }],
             Instruction::RotateRightThroughCarry { reg } => {
                 vec![
-                    MicroOp::NOP,
+                    MicroOp::Nop,
                     MicroOp::RotateRightThroughCarry {
                         reg: reg.into(),
                         set_zero: true,
@@ -1154,9 +1154,9 @@ impl Instruction {
             }
             Instruction::RotateRightThroughCarryWithIndirect { addr } => {
                 vec![
-                    MicroOp::NOP,
-                    MicroOp::NOP,
-                    MicroOp::NOP,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
                     MicroOp::RotateRightThroughCarry {
                         reg: addr.into(),
                         set_zero: true,
@@ -1169,7 +1169,7 @@ impl Instruction {
             }],
             Instruction::RotateLeft { reg } => {
                 vec![
-                    MicroOp::NOP,
+                    MicroOp::Nop,
                     MicroOp::RotateLeft {
                         reg: reg.into(),
                         set_zero: true,
@@ -1178,9 +1178,9 @@ impl Instruction {
             }
             Instruction::RotateLeftWithIndirect { addr } => {
                 vec![
-                    MicroOp::NOP,
-                    MicroOp::NOP,
-                    MicroOp::NOP,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
                     MicroOp::RotateLeft {
                         reg: addr.into(),
                         set_zero: true,
@@ -1193,7 +1193,7 @@ impl Instruction {
             }],
             Instruction::RotateRight { reg } => {
                 vec![
-                    MicroOp::NOP,
+                    MicroOp::Nop,
                     MicroOp::RotateRight {
                         reg: reg.into(),
                         set_zero: true,
@@ -1202,9 +1202,9 @@ impl Instruction {
             }
             Instruction::RotateRightWithIndirect { addr } => {
                 vec![
-                    MicroOp::NOP,
-                    MicroOp::NOP,
-                    MicroOp::NOP,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
                     MicroOp::RotateRight {
                         reg: addr.into(),
                         set_zero: true,
@@ -1213,54 +1213,54 @@ impl Instruction {
             }
             Instruction::ShiftLeftIntoCarry { reg } => {
                 vec![
-                    MicroOp::NOP,
+                    MicroOp::Nop,
                     MicroOp::ShiftLeftIntoCarry { reg: reg.into() },
                 ]
             }
             Instruction::ShiftLeftIntoCarryWithIndirect { addr } => {
                 vec![
-                    MicroOp::NOP,
-                    MicroOp::NOP,
-                    MicroOp::NOP,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
                     MicroOp::ShiftLeftIntoCarry { reg: addr.into() },
                 ]
             }
             Instruction::ShiftRightWithZeroIntoCarry { reg } => {
                 vec![
-                    MicroOp::NOP,
+                    MicroOp::Nop,
                     MicroOp::ShiftRightWithZeroIntoCarry { reg: reg.into() },
                 ]
             }
             Instruction::ShiftRightWithZeroIntoCarryWithIndirect { addr } => {
                 vec![
-                    MicroOp::NOP,
-                    MicroOp::NOP,
-                    MicroOp::NOP,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
                     MicroOp::ShiftRightWithZeroIntoCarry { reg: addr.into() },
                 ]
             }
             Instruction::ShiftRightWithSignIntoCarry { reg } => {
                 vec![
-                    MicroOp::NOP,
+                    MicroOp::Nop,
                     MicroOp::ShiftRightWithSignIntoCarry { reg: reg.into() },
                 ]
             }
             Instruction::ShiftRightWithSignIntoCarryWithIndirect { addr } => {
                 vec![
-                    MicroOp::NOP,
-                    MicroOp::NOP,
-                    MicroOp::NOP,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
                     MicroOp::ShiftRightWithSignIntoCarry { reg: addr.into() },
                 ]
             }
             Instruction::SwapReg8 { reg } => {
-                vec![MicroOp::NOP, MicroOp::SwapReg8 { reg: reg.into() }]
+                vec![MicroOp::Nop, MicroOp::SwapReg8 { reg: reg.into() }]
             }
             Instruction::SwapIndirect { addr } => {
                 vec![
-                    MicroOp::NOP,
-                    MicroOp::NOP,
-                    MicroOp::NOP,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
+                    MicroOp::Nop,
                     MicroOp::SwapReg8 { reg: addr.into() },
                 ]
             }

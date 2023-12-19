@@ -209,9 +209,10 @@ impl<M: Memory> PixelFIFO<M> {
             if self.current_x + 8 == oam.x_pos {
                 let in_oam_y = self.current_scan_line + 16 - oam.y_pos;
                 let pixels = oam.get_pixels(&self.memory, in_oam_y, self.oam_size);
-                for i in 0..8 {
+
+                for (i, &pixel) in pixels.into_iter().enumerate() {
                     if self.oam_fifo[i].color == 0 {
-                        self.oam_fifo[i] = pixels[i];
+                        self.oam_fifo[i] = pixel;
                     }
                 }
             }
@@ -231,9 +232,7 @@ fn choose_pixel(bg_pixel: Pixel, oam_pixel: Pixel, obj_enable: bool) -> Pixel {
                 source: PixelSource::OAM { bg_priority, .. },
             },
         ) => {
-            if !obj_enable {
-                bg_pixel
-            } else if oam_color == 0 {
+            if !obj_enable || oam_color == 0 {
                 bg_pixel
             } else if !bg_priority {
                 oam_pixel

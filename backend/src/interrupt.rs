@@ -103,7 +103,6 @@ impl InterruptController {
 
             self.timer_sub_counter += ticks;
             while self.timer_sub_counter >= divider {
-                self.timer_sub_counter;
                 let (new_timer, carry) = self.timer_counter.overflowing_add(1);
                 self.timer_counter = if carry {
                     self.trigger_timer_int();
@@ -168,18 +167,17 @@ impl InterruptController {
         }
 
         let requested = self.interrupt_flag & self.interrupt_enable & !IntKind::DUMMY;
-        for &kind in &[
+
+        [
             IntKind::VBLANK,
             IntKind::LCD_STAT,
             IntKind::TIMER,
             IntKind::SERIAL,
             IntKind::JOYPAD,
-        ] {
-            if requested.contains(kind) {
-                return Some(kind);
-            }
-        }
-        None
+        ]
+        .iter()
+        .find(|&&kind| requested.contains(kind))
+        .copied()
     }
 
     pub fn change_key_state(&mut self, key: Keys, pressed: bool) {

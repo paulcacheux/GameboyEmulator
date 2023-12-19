@@ -269,8 +269,8 @@ impl<M: Memory> CPU<M> {
             };
 
             let micro_ops = vec![
-                MicroOp::NOP,
-                MicroOp::NOP,
+                MicroOp::Nop,
+                MicroOp::Nop,
                 MicroOp::WriteMem {
                     addr: Register16::SP,
                     reg: Register8::PCHigh,
@@ -315,7 +315,7 @@ impl<M: Memory> CPU<M> {
 
         if let Some(micro_op) = self.pipeline.pop_front() {
             match micro_op {
-                MicroOp::NOP => {}
+                MicroOp::Nop => {}
                 MicroOp::Move8Bits {
                     destination,
                     source,
@@ -385,7 +385,7 @@ impl<M: Memory> CPU<M> {
 
                     self.store_reg16(Register16::HL, res);
 
-                    self.flags = self.flags & Flags::ZERO;
+                    self.flags &= Flags::ZERO;
                     if half_carry {
                         self.flags |= Flags::HALF_CARRY;
                     }
@@ -418,7 +418,7 @@ impl<M: Memory> CPU<M> {
                 MicroOp::SbcA { rhs } => {
                     self.sub_a(self.source_8bits_to_value(rhs), true, true);
                 }
-                MicroOp::DAA => {
+                MicroOp::Daa => {
                     let mut a = self.reg_a as u32;
 
                     if !self.flags.contains(Flags::NEGATIVE) {
