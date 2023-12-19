@@ -7,8 +7,9 @@ use clap::{App, Arg};
 use pixels::{Pixels, SurfaceTexture};
 use winit::{
     dpi::LogicalSize,
-    event::{ElementState, VirtualKeyCode},
+    event::ElementState,
     event_loop::{ControlFlow, EventLoop},
+    keyboard::{KeyCode, PhysicalKey},
     window::{Window, WindowBuilder},
 };
 
@@ -100,7 +101,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         emu_thread::run(cpu, ppu, is_ended_emu);
     });
 
-    let event_loop = EventLoop::new();
+    let event_loop = EventLoop::new()?;
 
     let mut main_window_data = {
         let window = {
@@ -161,28 +162,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         None
     };
 
-    event_loop.run(move |event, _, control_flow| {
+    event_loop.run(move |event, loop_proxy| {
         use winit::event::{Event, WindowEvent};
 
-        *control_flow = ControlFlow::Poll;
+        loop_proxy.set_control_flow(ControlFlow::Poll);
 
         match event {
-            Event::RedrawRequested(win_id) if win_id == main_window_data.window.id() => {
+            Event::WindowEvent {
+                window_id,
+                event: WindowEvent::RedrawRequested,
+            } if window_id == main_window_data.window.id() => {
                 display
                     .lock()
                     .unwrap()
-                    .draw_into_fb(main_window_data.framebuffer.get_frame());
+                    .draw_into_fb(main_window_data.framebuffer.frame_mut());
                 let _ = main_window_data.framebuffer.render();
             }
-            Event::RedrawRequested(win_id)
-                if Some(win_id) == tiles_window_data.as_ref().map(|d| d.window.id()) =>
-            {
+            Event::WindowEvent {
+                window_id,
+                event: WindowEvent::RedrawRequested,
+            } if Some(window_id) == tiles_window_data.as_ref().map(|d| d.window.id()) => {
                 if let Some(data) = tiles_window_data.as_mut() {
-                    Display::draw_tiles_into_fb(&memory, data.framebuffer.get_frame());
+                    Display::draw_tiles_into_fb(&memory, data.framebuffer.frame_mut());
                     let _ = data.framebuffer.render();
                 }
             }
-            Event::MainEventsCleared => {
+            Event::AboutToWait => {
                 let mut int_cont = interrupt_controller.lock().unwrap();
                 if int_cont.should_redraw {
                     main_window_data.window.request_redraw();
@@ -196,64 +201,66 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 event: WindowEvent::CloseRequested,
                 ..
             } => {
-                *control_flow = ControlFlow::Exit;
+                loop_proxy.exit();
             }
 
             Event::WindowEvent {
-                event: WindowEvent::KeyboardInput { input, .. },
+                event: WindowEvent::KeyboardInput { event, .. },
                 ..
             } => {
-                if let Some(vkc) = input.virtual_keycode {
+                if let PhysicalKey::Code(vkc) = event.physical_key {
                     // let pressed = input.state == ElementState::Pressed;
-                    let pressed: bool = match input.state {
+                    let pressed: bool = match event.state {
                         ElementState::Pressed => true,
                         ElementState::Released => false,
                     };
                     let mut int = interrupt_controller.lock().unwrap();
 
                     match vkc {
-                        VirtualKeyCode::Escape => {
-                            *control_flow = ControlFlow::Exit;
+                        KeyCode::Escape => {
+                            loop_proxy.exit();
                         }
-                        VirtualKeyCode::Z | VirtualKeyCode::Up => {
+                        KeyCode::KeyZ | KeyCode::ArrowUp => {
                             int.change_key_state(Keys::Up, pressed);
                         }
-                        VirtualKeyCode::Q | VirtualKeyCode::Left => {
+                        KeyCode::KeyQ | KeyCode::ArrowLeft => {
                             int.change_key_state(Keys::Left, pressed);
                         }
-                        VirtualKeyCode::S | VirtualKeyCode::Down => {
+                        KeyCode::KeyS | KeyCode::ArrowDown => {
                             int.change_key_state(Keys::Down, pressed);
                         }
-                        VirtualKeyCode::D | VirtualKeyCode::Right => {
+                        KeyCode::KeyD | KeyCode::ArrowRight => {
                             int.change_key_state(Keys::Right, pressed);
                         }
 
-                        VirtualKeyCode::O => {
+                        KeyCode::KeyO => {
                             int.change_key_state(Keys::A, pressed);
                         }
-                        VirtualKeyCode::P => {
+                        KeyCode::KeyP => {
                             int.change_key_state(Keys::B, pressed);
                         }
 
-                        VirtualKeyCode::Return => {
+                        KeyCode::Enter => {
                             int.change_key_state(Keys::Start, pressed);
                         }
-                        VirtualKeyCode::LControl => {
+                        KeyCode::ControlLeft => {
                             int.change_key_state(Keys::Select, pressed);
                         }
                         _ => {}
                     }
                 }
             }
-            Event::LoopDestroyed => {
+            Event::LoopExiting => {
                 is_ended.store(true, Ordering::Relaxed);
             }
             _ => {}
         }
-    });
+    })?;
+
+    Ok(())
 }
 
 struct WindowData {
     window: Window,
-    framebuffer: Pixels<Window>,
+    framebuffer: Pixels,
 }
