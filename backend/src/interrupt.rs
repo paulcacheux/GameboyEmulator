@@ -5,6 +5,7 @@ use bitflags::bitflags;
 pub type InterruptControllerPtr = Arc<Mutex<InterruptController>>;
 
 bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct IntKind: u8 {
         const VBLANK   = 1 << 0;
         const LCD_STAT = 1 << 1;

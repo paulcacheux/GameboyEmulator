@@ -6,6 +6,7 @@ use super::pixel::Pixel;
 use super::pixel::{read_tile_pixels, PixelSource};
 
 bitflags! {
+    #[derive(Debug, Clone, Copy)]
     pub struct OAMFlags: u8 {
         const OBJ_TO_BG_PRIORITY = 1 << 7;
         const Y_FLIP = 1 << 6;

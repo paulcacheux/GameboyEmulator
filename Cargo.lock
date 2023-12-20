@@ -606,7 +606,7 @@ dependencies = [
 name = "gbemu"
 version = "0.1.0"
 dependencies = [
- "bitflags 1.2.1",
+ "bitflags 2.4.1",
  "image",
  "log",
 ]

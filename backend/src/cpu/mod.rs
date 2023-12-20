@@ -19,6 +19,7 @@ use register::{Register16, Register8};
 use self::instruction::PrePostOperation;
 
 bitflags! {
+    #[derive(Debug, Clone, Copy)]
     struct Flags: u8 {
         const ZERO       = 1 << 7;
         const NEGATIVE   = 1 << 6;
