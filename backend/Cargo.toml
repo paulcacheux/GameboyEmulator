@@ -11,4 +11,4 @@ bitflags = "2.4.2"
 [dev-dependencies.image]
 default-features = false
 features = ["png"]
-version = "0.24.8"
+version = "0.24.9"
