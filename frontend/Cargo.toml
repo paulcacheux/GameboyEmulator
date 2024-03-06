@@ -13,4 +13,4 @@ clap = "4.5.1"
 
 [dependencies.winit]
 features = ["rwh_05"]
-version = "0.29.10"
+version = "0.29.14"
