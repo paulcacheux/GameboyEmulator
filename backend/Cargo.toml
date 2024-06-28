@@ -5,7 +5,7 @@ authors = ["Paul Cacheux <paulcacheux@gmail.com>"]
 edition = "2021"
 
 [dependencies]
-log = "0.4.21"
+log = "0.4.22"
 bitflags = "2.6.0"
 
 [dev-dependencies.image]
