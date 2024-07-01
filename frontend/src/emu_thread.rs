@@ -24,7 +24,7 @@ pub fn run<M: Memory + Clone>(mut cpu: CPU<M>, mut ppu: PPU<M>, is_ended: Arc<At
         last_instant = now;
 
         while nano_counter >= NANOS_IN_CYCLE {
-            cpu.step();
+            cpu.one_or_two_steps();
             ppu.step();
 
             nano_counter -= NANOS_IN_CYCLE;
