@@ -148,6 +148,19 @@ impl<M: Memory> CPU<M> {
         }
     }
 
+    pub fn is_in_cgb_super_speed_mode(&self) -> bool {
+        self.interrupt_controller.lock().unwrap().cgb_mode
+    }
+
+    pub fn one_or_two_steps(&mut self) {
+        if self.is_in_cgb_super_speed_mode() {
+            self.step();
+            self.step();
+        } else {
+            self.step();
+        }
+    }
+
     pub fn is_pipeline_empty(&self) -> bool {
         self.pipeline.is_empty()
     }
@@ -709,8 +722,14 @@ impl<M: Memory> CPU<M> {
                     self.halted = true;
                 }
                 MicroOp::Stop => {
-                    self.stoped = true;
-                    warn!("CPU stopped pc={:#x}", self.pc);
+                    let mut controller = self.interrupt_controller.lock().unwrap();
+                    if let Some(new_cgb_mode) = controller.requested_new_mode {
+                        controller.cgb_mode = new_cgb_mode;
+                        controller.requested_new_mode = None;
+                    } else {
+                        self.stoped = true;
+                        warn!("CPU stopped pc={:#x}", self.pc);
+                    }
                 }
             }
         }
