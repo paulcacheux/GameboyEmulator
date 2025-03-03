@@ -6,7 +6,7 @@ edition = "2021"
 
 [dependencies]
 log = "0.4.26"
-bitflags = "2.8.0"
+bitflags = "2.9.0"
 
 [dev-dependencies.image]
 default-features = false
